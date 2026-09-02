@@ -6,7 +6,6 @@ import { Calculator, Check, RotateCcw, Trophy } from "lucide-react";
 type Unit = "ml" | "l";
 
 type Product = {
-  name: string;
   price: string;
   volume: string;
   unit: Unit;
@@ -22,7 +21,6 @@ type CalculatedProduct = Product & {
 };
 
 const emptyProduct = (): Product => ({
-  name: "",
   price: "",
   volume: "",
   unit: "ml",
@@ -144,18 +142,8 @@ export function PriceComparator() {
                 {isWinner && <strong><Trophy /> Melhor compra</strong>}
               </div>
 
-              <label>
-                <span>Nome do produto</span>
-                <input
-                  value={product.name}
-                  onChange={(event) => update(index, "name", event.target.value)}
-                  placeholder={index === 0 ? "Ex.: Coca-Cola 2 L" : "Ex.: Coca-Cola lata"}
-                  maxLength={80}
-                />
-              </label>
-
               <div className="comparison-fields">
-                <label>
+                <label className="comparison-field-row">
                   <span>Preço total</span>
                   <div className="money-input">
                     <span>R$</span>
@@ -169,8 +157,8 @@ export function PriceComparator() {
                   </div>
                 </label>
 
-                <label>
-                  <span>Volume por unidade</span>
+                <label className="comparison-field-row">
+                  <span>Quantidade</span>
                   <div className="volume-input">
                     <input
                       value={product.volume}
@@ -190,7 +178,7 @@ export function PriceComparator() {
                   </div>
                 </label>
 
-                <label>
+                <label className="comparison-field-row">
                   <span>Unidades no pacote</span>
                   <input
                     value={product.amount}
@@ -223,7 +211,7 @@ export function PriceComparator() {
           <span><Trophy /></span>
           <div>
             <p>Melhor custo-benefício</p>
-            <h3>{winner.name.trim() || `Produto ${winner.index + 1}`}</h3>
+            <h3>Produto {winner.index + 1}</h3>
             <strong>
               {savings > 0.01
                 ? `${savings.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% mais barato por mL que a próxima opção.`

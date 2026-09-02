@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Check,
@@ -17,6 +17,7 @@ import {
   Sun,
   Trash2,
   Users,
+  X,
 } from "lucide-react";
 import { PriceComparator } from "./price-comparator";
 
@@ -43,6 +44,7 @@ function firstName(value: string) {
 
 export function ShoppingApp({ userName, familyName, inviteCode }: Props) {
   const router = useRouter();
+  const inviteButtonRef = useRef<HTMLButtonElement>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -52,6 +54,7 @@ export function ShoppingApp({ userName, familyName, inviteCode }: Props) {
   const [error, setError] = useState("");
   const [dark, setDark] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
   const [mode, setMode] = useState<"list" | "compare">("list");
 
   useEffect(() => {
@@ -97,6 +100,20 @@ export function ShoppingApp({ userName, familyName, inviteCode }: Props) {
       document.removeEventListener("visibilitychange", refresh);
     };
   }, [loadItems]);
+
+  useEffect(() => {
+    if (!inviteOpen) return;
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setInviteOpen(false);
+        window.requestAnimationFrame(() => inviteButtonRef.current?.focus());
+      }
+    }
+
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [inviteOpen]);
 
   const pending = useMemo(() => items.filter((item) => !item.completed), [items]);
   const completed = useMemo(() => items.filter((item) => item.completed), [items]);
@@ -177,6 +194,11 @@ export function ShoppingApp({ userName, familyName, inviteCode }: Props) {
     window.setTimeout(() => setCopied(false), 1800);
   }
 
+  function closeInvite() {
+    setInviteOpen(false);
+    window.requestAnimationFrame(() => inviteButtonRef.current?.focus());
+  }
+
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/entrar");
@@ -228,22 +250,34 @@ export function ShoppingApp({ userName, familyName, inviteCode }: Props) {
               {pending.length === 0 ? "Nada faltando por enquanto." : `${pending.length} ${pending.length === 1 ? "item falta" : "itens faltam"} comprar.`}
             </p>
           </div>
-          <button className="icon-button refresh-button" type="button" onClick={() => void loadItems()} aria-label="Atualizar lista" disabled={loading}>
-            <RefreshCw className={loading ? "spin" : ""} />
-          </button>
+          <div className="welcome-actions">
+            {inviteCode && (
+              <button ref={inviteButtonRef} className="invite-trigger" type="button" onClick={() => setInviteOpen(true)}>
+                <Users /> Convidar
+              </button>
+            )}
+            <button className="icon-button refresh-button" type="button" onClick={() => void loadItems()} aria-label="Atualizar lista" disabled={loading}>
+              <RefreshCw className={loading ? "spin" : ""} />
+            </button>
+          </div>
         </div>
 
-        {inviteCode && (
-          <div className="invite-banner">
-            <Users />
-            <div>
-              <span>Código da família</span>
+        {inviteCode && inviteOpen && (
+          <div className="invite-modal-backdrop" role="presentation" onMouseDown={closeInvite}>
+            <div className="invite-modal" role="dialog" aria-modal="true" aria-labelledby="invite-title" onMouseDown={(event) => event.stopPropagation()}>
+              <button className="icon-button invite-close" type="button" onClick={closeInvite} aria-label="Fechar convite" autoFocus>
+                <X />
+              </button>
+              <span className="invite-modal-icon"><Users /></span>
+              <p>Convide alguém para sua lista</p>
+              <h2 id="invite-title">Código da família</h2>
               <strong>{inviteCode}</strong>
+              <small>Compartilhe este código somente com quem fará parte da família.</small>
+              <button className="primary-button invite-copy" type="button" onClick={() => void copyInvite()}>
+                <Clipboard />
+                {copied ? "Código copiado!" : "Copiar código"}
+              </button>
             </div>
-            <button type="button" onClick={() => void copyInvite()}>
-              <Clipboard />
-              {copied ? "Copiado!" : "Copiar"}
-            </button>
           </div>
         )}
 
@@ -323,7 +357,7 @@ function ItemRow({ item, busy, onToggle, onRemove }: { item: Item; busy: boolean
         {busy ? <LoaderCircle className="spin" /> : item.completed ? <Check /> : null}
       </button>
       <div className="item-copy">
-        <div><strong>{item.name}</strong>{item.quantity && <span>{item.quantity}</span>}</div>
+        <div>{item.quantity && <span>{item.quantity}</span>}<strong>{item.name}</strong></div>
         <small>{item.completed && item.completedBy ? `Comprado por ${firstName(item.completedBy)}` : `Adicionado por ${firstName(item.addedBy)}`}</small>
       </div>
       <button className="icon-button delete-button" type="button" onClick={() => onRemove(item.id)} aria-label={`Excluir ${item.name}`} disabled={busy}><Trash2 /></button>
