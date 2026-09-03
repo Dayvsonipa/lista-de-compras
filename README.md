@@ -17,6 +17,7 @@ Sistema web de lista de compras compartilhada para famílias.
 - Atualização automática da lista a cada 8 segundos.
 - Tema claro e escuro com preferência salva no celular.
 - Interface responsiva para celular, tablet e computador.
+- Instalação como aplicativo no Android, com ícone próprio e abertura sem a barra de endereço.
 
 ## Tecnologias
 
@@ -81,11 +82,22 @@ A partir desse momento, os dois acessam a mesma lista, cada um usando sua própr
 Na parte superior da lista, abra **Comparar preços**:
 
 1. Escolha comparar 2 ou 3 produtos.
-2. Informe o nome, o preço total e o volume de cada produto.
+2. Informe o preço total e a quantidade de cada produto.
 3. Selecione mL ou litros.
 4. Para fardos ou pacotes, informe quantas unidades estão incluídas.
 
 O sistema calcula o preço por mL, apresenta o equivalente por litro e destaca automaticamente a opção mais econômica.
+
+## Instalar no Android
+
+Depois de publicar a versão mais recente na Vercel:
+
+1. Abra o endereço do sistema diretamente no Google Chrome.
+2. Toque nos três pontos no canto superior direito.
+3. Escolha **Instalar app** ou **Adicionar à tela inicial**.
+4. Confirme a instalação como **Lista de Casa**.
+
+Ao abrir pelo novo ícone, o sistema funciona em modo aplicativo, sem exibir a barra de endereço. Se já havia um atalho antigo, remova-o e instale novamente para que o Android reconheça o novo PWA.
 
 ## Segurança
 

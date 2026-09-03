@@ -7,8 +7,19 @@ export const metadata: Metadata = {
     template: "%s | Lista de Casa",
   },
   description: "Lista de compras compartilhada para toda a família.",
+  applicationName: "Lista de Casa",
+  manifest: "/manifest.webmanifest",
   icons: {
     icon: "/favicon.svg",
+    apple: "/icon-192.png",
+  },
+  appleWebApp: {
+    capable: true,
+    title: "Lista de Casa",
+    statusBarStyle: "black-translucent",
+  },
+  formatDetection: {
+    telephone: false,
   },
 };
 
