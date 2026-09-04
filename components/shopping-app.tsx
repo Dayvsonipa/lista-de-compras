@@ -25,6 +25,7 @@ type Item = {
   id: string;
   name: string;
   quantity: string;
+  price: number | null;
   completed: boolean;
   addedBy: string;
   completedBy: string | null;
@@ -42,12 +43,33 @@ function firstName(value: string) {
   return value.trim().split(/\s+/)[0] || value;
 }
 
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(value);
+}
+
+function quantityMultiplier(value: string) {
+  const match = value.trim().match(/^(\d+(?:[.,]\d+)?)/);
+  if (!match) return 1;
+
+  const quantity = Number(match[1].replace(",", "."));
+  return Number.isFinite(quantity) && quantity > 0 ? quantity : 1;
+}
+
+function itemTotal(item: Item) {
+  if (item.price === null) return null;
+  return Math.round((item.price * quantityMultiplier(item.quantity) + Number.EPSILON) * 100) / 100;
+}
+
 export function ShoppingApp({ userName, familyName, inviteCode }: Props) {
   const router = useRouter();
   const inviteButtonRef = useRef<HTMLButtonElement>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("");
+  const [price, setPrice] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -117,6 +139,10 @@ export function ShoppingApp({ userName, familyName, inviteCode }: Props) {
 
   const pending = useMemo(() => items.filter((item) => !item.completed), [items]);
   const completed = useMemo(() => items.filter((item) => item.completed), [items]);
+  const pendingTotal = useMemo(
+    () => pending.reduce((total, item) => total + Math.round((itemTotal(item) ?? 0) * 100), 0) / 100,
+    [pending],
+  );
   const progress = items.length ? Math.round((completed.length / items.length) * 100) : 0;
 
   function toggleTheme() {
@@ -141,9 +167,10 @@ export function ShoppingApp({ userName, familyName, inviteCode }: Props) {
     if (!name.trim()) return;
     setSaving(true);
     try {
-      await request("POST", { name, quantity });
+      await request("POST", { name, quantity, price });
       setName("");
       setQuantity("");
+      setPrice("");
       await loadItems(true);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Não foi possível adicionar.");
@@ -290,6 +317,17 @@ export function ShoppingApp({ userName, familyName, inviteCode }: Props) {
             <span>Quantidade</span>
             <input value={quantity} onChange={(event) => setQuantity(event.target.value)} placeholder="Ex.: 2 un." maxLength={40} autoComplete="off" />
           </label>
+          <label className="price-field">
+            <span>Preço unitário</span>
+            <input
+              value={price}
+              onChange={(event) => setPrice(event.target.value.replace(/[^\d,.]/g, "").slice(0, 15))}
+              placeholder="R$ 0,00"
+              inputMode="decimal"
+              autoComplete="off"
+              aria-label="Preço por unidade, opcional"
+            />
+          </label>
           <button className="primary-button add-button" type="submit" disabled={saving || !name.trim()}>
             {saving ? <LoaderCircle className="spin" /> : <Plus />}
             Adicionar
@@ -317,7 +355,10 @@ export function ShoppingApp({ userName, familyName, inviteCode }: Props) {
         ) : (
           <div className="list-sections">
             <section>
-              <div className="section-heading"><h2>Para comprar</h2><span>{pending.length}</span></div>
+              <div className="section-heading">
+                <div className="section-title-total"><h2>Para comprar</h2><strong>{formatCurrency(pendingTotal)}</strong></div>
+                <span>{pending.length}</span>
+              </div>
               {pending.length === 0 ? (
                 <div className="all-done"><Check /> Tudo comprado!</div>
               ) : (
@@ -351,13 +392,23 @@ export function ShoppingApp({ userName, familyName, inviteCode }: Props) {
 }
 
 function ItemRow({ item, busy, onToggle, onRemove }: { item: Item; busy: boolean; onToggle: (item: Item) => void; onRemove: (id: string) => void }) {
+  const total = itemTotal(item);
+
   return (
     <li className={`item-row ${item.completed ? "is-completed" : ""}`}>
       <button className="check-button" type="button" onClick={() => onToggle(item)} aria-label={item.completed ? `Devolver ${item.name} para a lista` : `Marcar ${item.name} como comprado`} disabled={busy}>
         {busy ? <LoaderCircle className="spin" /> : item.completed ? <Check /> : null}
       </button>
       <div className="item-copy">
-        <div>{item.quantity && <span>{item.quantity}</span>}<strong>{item.name}</strong></div>
+        <div className="item-main-line">
+          <div className="item-description">{item.quantity && <span>{item.quantity}</span>}<strong>{item.name}</strong></div>
+          {item.price !== null && total !== null && (
+            <div className="item-price" aria-label={`${formatCurrency(item.price)} por unidade; total ${formatCurrency(total)}`}>
+              <span>{formatCurrency(item.price)}/un.</span>
+              <strong>{formatCurrency(total)}</strong>
+            </div>
+          )}
+        </div>
         <small>{item.completed && item.completedBy ? `Comprado por ${firstName(item.completedBy)}` : `Adicionado por ${firstName(item.addedBy)}`}</small>
       </div>
       <button className="icon-button delete-button" type="button" onClick={() => onRemove(item.id)} aria-label={`Excluir ${item.name}`} disabled={busy}><Trash2 /></button>

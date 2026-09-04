@@ -11,6 +11,7 @@ Sistema web de lista de compras compartilhada para famílias.
 - Entrada na família por código de 8 caracteres.
 - Uma lista compartilhada por família.
 - Identificação de quem adicionou e de quem comprou.
+- Preço unitário opcional, cálculo pela quantidade e soma dos itens que ainda faltam comprar.
 - Comparação de preços entre 2 ou 3 produtos.
 - Cálculo automático do preço por mL e por litro.
 - Comparação de garrafas, latas e pacotes com várias unidades.
@@ -50,6 +51,16 @@ npm run dev
 ```
 
 Abra http://localhost:3000.
+
+### Atualizar um banco que já está em uso
+
+Se o sistema já estiver publicado, execute no SQL Editor do Neon o arquivo:
+
+```text
+database/migrations/001_add_item_price.sql
+```
+
+Ele adiciona a coluna de preço sem apagar os dados atuais. O passo a passo completo está em `ATUALIZACAO-PRECO.md`.
 
 ## 3. Publicar
 

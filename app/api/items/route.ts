@@ -3,6 +3,23 @@ import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { cleanText } from "@/lib/validation";
 
+function parsePrice(value: unknown) {
+  if (value === null || value === undefined) return null;
+
+  const raw = String(value).trim().replace(/^R\$\s*/i, "").replace(/\s/g, "");
+  if (!raw) return null;
+
+  const normalized = raw.includes(",")
+    ? raw.replace(/\./g, "").replace(",", ".")
+    : raw;
+
+  if (!/^\d+(?:\.\d{1,2})?$/.test(normalized)) return Number.NaN;
+
+  const price = Number(normalized);
+  if (!Number.isFinite(price) || price < 0 || price > 9_999_999_999.99) return Number.NaN;
+  return price.toFixed(2);
+}
+
 async function familyUser() {
   const user = await getSessionUser();
   if (!user) return { error: Response.json({ error: "Faça login novamente." }, { status: 401 }) };
@@ -20,6 +37,7 @@ export async function GET() {
         si.id,
         si.name,
         si.quantity,
+        si.price,
         si.completed,
         si.created_at,
         si.completed_at,
@@ -38,6 +56,7 @@ export async function GET() {
         id: String(row.id),
         name: String(row.name),
         quantity: String(row.quantity ?? ""),
+        price: row.price === null ? null : Number(row.price),
         completed: Boolean(row.completed),
         createdAt: String(row.created_at),
         completedAt: row.completed_at ? String(row.completed_at) : null,
@@ -55,16 +74,18 @@ export async function POST(request: Request) {
     const auth = await familyUser();
     if ("error" in auth) return auth.error;
 
-    const body = (await request.json()) as { name?: string; quantity?: string };
+    const body = (await request.json()) as { name?: string; quantity?: string; price?: string | number };
     const name = cleanText(body.name, 120);
     const quantity = cleanText(body.quantity, 40);
+    const price = parsePrice(body.price);
     if (!name) return Response.json({ error: "Informe o produto." }, { status: 400 });
+    if (Number.isNaN(price)) return Response.json({ error: "Informe um preço válido, com no máximo duas casas decimais." }, { status: 400 });
 
     const id = randomUUID();
     const sql = db();
     await sql`
-      INSERT INTO shopping_items (id, family_id, name, quantity, added_by)
-      VALUES (${id}, ${auth.user.familyId}, ${name}, ${quantity}, ${auth.user.id})
+      INSERT INTO shopping_items (id, family_id, name, quantity, price, added_by)
+      VALUES (${id}, ${auth.user.familyId}, ${name}, ${quantity}, ${price}, ${auth.user.id})
     `;
 
     return Response.json({ ok: true, id }, { status: 201 });

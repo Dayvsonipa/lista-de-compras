@@ -725,7 +725,7 @@ button:disabled {
 
 .add-form {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 9rem auto;
+  grid-template-columns: minmax(0, 1fr) 8rem 8rem auto;
   align-items: end;
   gap: 0.7rem;
   margin: 0 1.35rem;
@@ -791,6 +791,19 @@ button:disabled {
   font-size: 1rem;
 }
 
+.section-title-total {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 0.7rem;
+}
+
+.section-title-total > strong {
+  color: var(--primary);
+  font-size: 0.92rem;
+  white-space: nowrap;
+}
+
 .section-heading > span {
   display: grid;
   min-width: 1.7rem;
@@ -843,10 +856,21 @@ button:disabled {
   min-width: 0;
 }
 
-.item-copy > div {
+.item-main-line,
+.item-description {
   display: flex;
   align-items: baseline;
   gap: 0.38rem;
+}
+
+.item-main-line {
+  min-width: 0;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.item-description {
+  min-width: 0;
 }
 
 .item-copy strong {
@@ -855,11 +879,32 @@ button:disabled {
   font-size: 1.04rem;
 }
 
-.item-copy > div > span {
+.item-description > span {
   flex: 0 0 auto;
   color: var(--primary);
   font-size: 1.04rem;
   font-weight: 820;
+}
+
+.item-price {
+  display: grid;
+  flex: 0 0 auto;
+  justify-items: end;
+  gap: 0.08rem;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.item-price > span {
+  color: var(--muted-foreground);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.item-price > strong {
+  color: var(--primary);
+  font-size: 0.9rem;
+  font-weight: 800;
 }
 
 .item-copy small {
@@ -879,7 +924,7 @@ button:disabled {
   background: var(--primary);
 }
 
-.item-row.is-completed .item-copy strong {
+.item-row.is-completed .item-description strong {
   text-decoration: line-through;
 }
 
@@ -1418,7 +1463,11 @@ button:disabled {
   }
 
   .add-form {
-    grid-template-columns: minmax(0, 1fr) 7.5rem;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .product-field {
+    grid-column: 1 / -1;
   }
 
   .add-button {
@@ -1482,11 +1531,11 @@ button:disabled {
   }
 
   .add-form {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 
   .add-button {
-    grid-column: auto;
+    grid-column: 1 / -1;
   }
 
   .app-mode-tabs button {

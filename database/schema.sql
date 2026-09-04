@@ -35,11 +35,13 @@ CREATE TABLE IF NOT EXISTS shopping_items (
   family_id UUID NOT NULL REFERENCES families(id) ON DELETE CASCADE,
   name VARCHAR(120) NOT NULL,
   quantity VARCHAR(40) NOT NULL DEFAULT '',
+  price NUMERIC(12, 2),
   completed BOOLEAN NOT NULL DEFAULT FALSE,
   added_by UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   completed_by UUID REFERENCES users(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  completed_at TIMESTAMPTZ
+  completed_at TIMESTAMPTZ,
+  CONSTRAINT shopping_items_price_nonnegative CHECK (price IS NULL OR price >= 0)
 );
 
 CREATE TABLE IF NOT EXISTS sessions (
