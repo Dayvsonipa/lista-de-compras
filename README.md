@@ -67,15 +67,15 @@ Abra http://localhost:3000.
 
 ## Primeiro uso
 
-1. Dayvson cria uma conta.
+1. Uma pessoa cria a própria conta.
 2. Escolhe **Criar uma família**.
-3. Define o nome, por exemplo, `Família Rodrigues`.
+3. Define o nome, por exemplo, `Família Silva`.
 4. Copia o código exibido na lista.
-5. Bia cria a própria conta.
+5. Outro integrante cria a própria conta.
 6. Escolhe **Entrar em uma família**.
-7. Digita o código enviado por Dayvson.
+7. Digita o código recebido.
 
-A partir desse momento, os dois acessam a mesma lista, cada um usando sua própria conta.
+A partir desse momento, os integrantes acessam a mesma lista, cada um usando sua própria conta.
 
 ## Comparador de preços
 

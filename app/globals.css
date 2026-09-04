@@ -1505,6 +1505,21 @@ button:disabled {
   }
 }
 
+/* Mantém os controles fora da câmera e do indicador de início no app instalado no iOS. */
+@supports (-webkit-touch-callout: none) {
+  @media (display-mode: standalone) and (max-width: 720px) {
+    .app-header {
+      padding-top: calc(1.2rem + env(safe-area-inset-top, 0px));
+      padding-right: calc(1rem + env(safe-area-inset-right, 0px));
+      padding-left: calc(1rem + env(safe-area-inset-left, 0px));
+    }
+
+    .app-footer {
+      padding-bottom: calc(1.35rem + env(safe-area-inset-bottom, 0px));
+    }
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

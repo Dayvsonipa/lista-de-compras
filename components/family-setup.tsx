@@ -47,10 +47,10 @@ export function FamilySetup({ firstName }: { firstName: string }) {
           <form className="family-option" onSubmit={(event) => void submit(event, "create")}>
             <div className="option-icon"><Users /></div>
             <h2>Criar uma família</h2>
-            <p>Você receberá um código para convidar a Bia.</p>
+            <p>Você receberá um código para convidar outras pessoas.</p>
             <label>
               <span>Nome da família</span>
-              <input name="name" placeholder="Ex.: Família Rodrigues" minLength={2} maxLength={100} required />
+              <input name="name" placeholder="Ex.: Família Silva" minLength={2} maxLength={100} required />
             </label>
             <button className="primary-button" type="submit" disabled={busy !== null}>
               {busy === "create" ? <LoaderCircle className="spin" /> : <ArrowRight />}

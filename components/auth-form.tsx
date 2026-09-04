@@ -54,7 +54,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         <div className="auth-brand">
           <span><ShoppingBasket /></span>
           <div>
-            <p>Dayvson &amp; Bia</p>
+            <p>Lista compartilhada</p>
             <strong>Lista de Casa</strong>
           </div>
         </div>
