@@ -13,6 +13,7 @@ export type SessionUser = {
   familyName: string | null;
   role: "owner" | "member" | null;
   inviteCode: string | null;
+  collectPricesOnPurchase: boolean;
 };
 
 function tokenHash(token: string) {
@@ -65,6 +66,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
       u.email,
       fm.family_id,
       f.name AS family_name,
+      f.collect_prices_on_purchase,
       fm.role,
       (
         SELECT fi.code
@@ -94,5 +96,6 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     familyName: row.family_name ? String(row.family_name) : null,
     role: row.role === "owner" || row.role === "member" ? row.role : null,
     inviteCode: row.invite_code ? String(row.invite_code) : null,
+    collectPricesOnPurchase: Boolean(row.collect_prices_on_purchase),
   };
 }

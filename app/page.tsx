@@ -14,6 +14,8 @@ export default async function Home() {
       userName={user.name}
       familyName={user.familyName}
       inviteCode={user.inviteCode}
+      initialCollectPricesOnPurchase={user.collectPricesOnPurchase}
+      canManageFamily={user.role === "owner"}
     />
   );
 }

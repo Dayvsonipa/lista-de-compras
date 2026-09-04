@@ -11,7 +11,9 @@ Sistema web de lista de compras compartilhada para famílias.
 - Entrada na família por código de 8 caracteres.
 - Uma lista compartilhada por família.
 - Identificação de quem adicionou e de quem comprou.
-- Preço unitário opcional, cálculo pela quantidade e soma dos itens que ainda faltam comprar.
+- Configuração familiar para registrar ou não preços durante a compra.
+- Preço unitário opcional ao marcar um produto como comprado.
+- Cálculo automático por quantidade e total dos produtos no carrinho.
 - Comparação de preços entre 2 ou 3 produtos.
 - Cálculo automático do preço por mL e por litro.
 - Comparação de garrafas, latas e pacotes com várias unidades.
@@ -57,10 +59,22 @@ Abra http://localhost:3000.
 Se o sistema já estiver publicado, execute no SQL Editor do Neon o arquivo:
 
 ```text
-database/migrations/001_add_item_price.sql
+database/migrations/002_purchase_price_settings.sql
 ```
 
-Ele adiciona a coluna de preço sem apagar os dados atuais. O passo a passo completo está em `ATUALIZACAO-PRECO.md`.
+Ele adiciona a configuração familiar e o preço unitário sem apagar usuários, famílias ou produtos. O passo a passo completo está em `ATUALIZACAO-PRECO.md`.
+
+## Registrar preços durante a compra
+
+O criador da família pode abrir **Família** e ativar **Registrar preços durante a compra**. Quando essa opção está ligada:
+
+1. Os produtos continuam sendo cadastrados somente com nome e quantidade.
+2. Ao marcar um produto como comprado, o aplicativo solicita o preço de uma unidade.
+3. O sistema multiplica o preço pela quantidade cadastrada.
+4. O produto permanece em **No carrinho** mostrando preço unitário e total calculado.
+5. O total da compra fica visível até alguém escolher **Limpar comprados**.
+
+Se a quantidade estiver vazia, o sistema considera uma unidade. Quantidades como `2 caixas` e `1,5 kg` são interpretadas usando o primeiro número informado.
 
 ## 3. Publicar
 

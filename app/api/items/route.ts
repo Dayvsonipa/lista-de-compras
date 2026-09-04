@@ -37,7 +37,7 @@ export async function GET() {
         si.id,
         si.name,
         si.quantity,
-        si.price,
+        si.unit_price,
         si.completed,
         si.created_at,
         si.completed_at,
@@ -56,13 +56,14 @@ export async function GET() {
         id: String(row.id),
         name: String(row.name),
         quantity: String(row.quantity ?? ""),
-        price: row.price === null ? null : Number(row.price),
+        unitPrice: row.unit_price === null ? null : Number(row.unit_price),
         completed: Boolean(row.completed),
         createdAt: String(row.created_at),
         completedAt: row.completed_at ? String(row.completed_at) : null,
         addedBy: String(row.added_by_name),
         completedBy: row.completed_by_name ? String(row.completed_by_name) : null,
       })),
+      collectPricesOnPurchase: auth.user.collectPricesOnPurchase,
     });
   } catch {
     return Response.json({ error: "Não foi possível carregar a lista." }, { status: 500 });
@@ -74,18 +75,16 @@ export async function POST(request: Request) {
     const auth = await familyUser();
     if ("error" in auth) return auth.error;
 
-    const body = (await request.json()) as { name?: string; quantity?: string; price?: string | number };
+    const body = (await request.json()) as { name?: string; quantity?: string };
     const name = cleanText(body.name, 120);
     const quantity = cleanText(body.quantity, 40);
-    const price = parsePrice(body.price);
     if (!name) return Response.json({ error: "Informe o produto." }, { status: 400 });
-    if (Number.isNaN(price)) return Response.json({ error: "Informe um preço válido, com no máximo duas casas decimais." }, { status: 400 });
 
     const id = randomUUID();
     const sql = db();
     await sql`
-      INSERT INTO shopping_items (id, family_id, name, quantity, price, added_by)
-      VALUES (${id}, ${auth.user.familyId}, ${name}, ${quantity}, ${price}, ${auth.user.id})
+      INSERT INTO shopping_items (id, family_id, name, quantity, added_by)
+      VALUES (${id}, ${auth.user.familyId}, ${name}, ${quantity}, ${auth.user.id})
     `;
 
     return Response.json({ ok: true, id }, { status: 201 });
@@ -99,9 +98,16 @@ export async function PATCH(request: Request) {
     const auth = await familyUser();
     if ("error" in auth) return auth.error;
 
-    const body = (await request.json()) as { id?: string; completed?: boolean };
+    const body = (await request.json()) as { id?: string; completed?: boolean; unitPrice?: string | number | null };
     if (typeof body.id !== "string" || typeof body.completed !== "boolean") {
       return Response.json({ error: "Alteração inválida." }, { status: 400 });
+    }
+
+    const unitPrice = body.completed && auth.user.collectPricesOnPurchase
+      ? parsePrice(body.unitPrice)
+      : null;
+    if (Number.isNaN(unitPrice)) {
+      return Response.json({ error: "Informe um preço válido, com no máximo duas casas decimais." }, { status: 400 });
     }
 
     const sql = db();
@@ -110,7 +116,8 @@ export async function PATCH(request: Request) {
       SET
         completed = ${body.completed},
         completed_by = CASE WHEN ${body.completed} THEN ${auth.user.id}::uuid ELSE NULL END,
-        completed_at = CASE WHEN ${body.completed} THEN NOW() ELSE NULL END
+        completed_at = CASE WHEN ${body.completed} THEN NOW() ELSE NULL END,
+        unit_price = CASE WHEN ${body.completed} THEN ${unitPrice}::numeric ELSE NULL END
       WHERE id = ${body.id}
         AND family_id = ${auth.user.familyId}
       RETURNING id

@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS families (
   id UUID PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
   created_by UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  collect_prices_on_purchase BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -35,13 +36,13 @@ CREATE TABLE IF NOT EXISTS shopping_items (
   family_id UUID NOT NULL REFERENCES families(id) ON DELETE CASCADE,
   name VARCHAR(120) NOT NULL,
   quantity VARCHAR(40) NOT NULL DEFAULT '',
-  price NUMERIC(12, 2),
+  unit_price NUMERIC(12, 2),
   completed BOOLEAN NOT NULL DEFAULT FALSE,
   added_by UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   completed_by UUID REFERENCES users(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   completed_at TIMESTAMPTZ,
-  CONSTRAINT shopping_items_price_nonnegative CHECK (price IS NULL OR price >= 0)
+  CONSTRAINT shopping_items_unit_price_nonnegative CHECK (unit_price IS NULL OR unit_price >= 0)
 );
 
 CREATE TABLE IF NOT EXISTS sessions (
