@@ -4,6 +4,7 @@ Sistema web de lista de compras compartilhada para famílias.
 
 ## O que já está pronto
 
+- Tela de abertura leve e adaptada às áreas seguras de Android e iPhone.
 - Cadastro com nome, e-mail e senha.
 - Login e sessão segura por cookie HTTP-only.
 - Senhas protegidas com `scrypt` e salt individual.
@@ -11,6 +12,8 @@ Sistema web de lista de compras compartilhada para famílias.
 - Entrada na família por código de 8 caracteres.
 - Uma lista compartilhada por família.
 - Identificação de quem adicionou e de quem comprou.
+- Quantidade numérica de pacotes ou unidades, com controles de aumentar e diminuir.
+- Edição do nome e da quantidade antes de marcar o produto como comprado.
 - Configuração familiar para registrar ou não preços durante a compra.
 - Preço unitário opcional ao marcar um produto como comprado.
 - Cálculo automático por quantidade e total dos produtos no carrinho.
@@ -74,7 +77,18 @@ O criador da família pode abrir **Família** e ativar **Registrar preços duran
 4. O produto permanece em **No carrinho** mostrando preço unitário e total calculado.
 5. O total da compra fica visível até alguém escolher **Limpar comprados**.
 
-Se a quantidade estiver vazia, o sistema considera uma unidade. Quantidades como `2 caixas` e `1,5 kg` são interpretadas usando o primeiro número informado.
+A quantidade é um número inteiro de pacotes ou unidades. Registros antigos como `2 un.` ou `2 pacotes` continuam sendo reconhecidos; textos de peso, como `5 kg`, são tratados como uma unidade até serem corrigidos pelo botão de edição.
+
+## Cadastrar nome, tamanho e quantidade
+
+Inclua o tamanho ou peso no nome do produto e use **Quantidade** somente para informar quantos pacotes ou unidades serão comprados:
+
+```text
+Produto: Arroz 5 kg
+Quantidade: 2
+```
+
+O item aparecerá como `2 × Arroz 5 kg`. A quantidade aceita valores inteiros de 1 a 999 e pode ser ajustada pelos botões `–` e `+`. Antes da compra, use o botão de lápis para corrigir o produto ou a quantidade.
 
 ## 3. Publicar
 

@@ -20,6 +20,17 @@ function parsePrice(value: unknown) {
   return price.toFixed(2);
 }
 
+function parseItemQuantity(value: unknown) {
+  if (value === undefined || value === null || value === "") return "1";
+
+  const raw = String(value).trim();
+  if (!/^\d{1,3}$/.test(raw)) return null;
+
+  const quantity = Number(raw);
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > 999) return null;
+  return String(quantity);
+}
+
 async function familyUser() {
   const user = await getSessionUser();
   if (!user) return { error: Response.json({ error: "Faça login novamente." }, { status: 401 }) };
@@ -77,8 +88,9 @@ export async function POST(request: Request) {
 
     const body = (await request.json()) as { name?: string; quantity?: string };
     const name = cleanText(body.name, 120);
-    const quantity = cleanText(body.quantity, 40);
+    const quantity = parseItemQuantity(body.quantity);
     if (!name) return Response.json({ error: "Informe o produto." }, { status: 400 });
+    if (!quantity) return Response.json({ error: "Informe uma quantidade entre 1 e 999." }, { status: 400 });
 
     const id = randomUUID();
     const sql = db();
@@ -98,8 +110,33 @@ export async function PATCH(request: Request) {
     const auth = await familyUser();
     if ("error" in auth) return auth.error;
 
-    const body = (await request.json()) as { id?: string; completed?: boolean; unitPrice?: string | number | null };
-    if (typeof body.id !== "string" || typeof body.completed !== "boolean") {
+    const body = (await request.json()) as { id?: string; name?: string; quantity?: string; completed?: boolean; unitPrice?: string | number | null };
+    if (typeof body.id !== "string") {
+      return Response.json({ error: "Alteração inválida." }, { status: 400 });
+    }
+
+    const sql = db();
+
+    if (body.name !== undefined || body.quantity !== undefined) {
+      const name = cleanText(body.name, 120);
+      const quantity = parseItemQuantity(body.quantity);
+      if (!name) return Response.json({ error: "Informe o produto." }, { status: 400 });
+      if (!quantity) return Response.json({ error: "Informe uma quantidade entre 1 e 999." }, { status: 400 });
+
+      const rows = await sql`
+        UPDATE shopping_items
+        SET name = ${name}, quantity = ${quantity}
+        WHERE id = ${body.id}
+          AND family_id = ${auth.user.familyId}
+          AND completed = FALSE
+        RETURNING id
+      `;
+
+      if (rows.length === 0) return Response.json({ error: "Produto não encontrado ou já comprado." }, { status: 404 });
+      return Response.json({ ok: true });
+    }
+
+    if (typeof body.completed !== "boolean") {
       return Response.json({ error: "Alteração inválida." }, { status: 400 });
     }
 
@@ -110,7 +147,6 @@ export async function PATCH(request: Request) {
       return Response.json({ error: "Informe um preço válido, com no máximo duas casas decimais." }, { status: 400 });
     }
 
-    const sql = db();
     const rows = await sql`
       UPDATE shopping_items
       SET

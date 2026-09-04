@@ -10,7 +10,9 @@ import {
   LoaderCircle,
   ListChecks,
   LogOut,
+  Minus,
   Moon,
+  Pencil,
   Plus,
   RefreshCw,
   Settings,
@@ -54,11 +56,23 @@ function formatCurrency(value: number) {
 }
 
 function quantityMultiplier(value: string) {
-  const match = value.trim().match(/^(\d+(?:[.,]\d+)?)/);
+  const match = value.trim().match(/^(\d+)(?:\s*(?:un\.?|unidades?|pacotes?|pcts?\.?|caixas?|garrafas?|fardos?))?$/i);
   if (!match) return 1;
 
-  const quantity = Number(match[1].replace(",", "."));
-  return Number.isFinite(quantity) && quantity > 0 ? quantity : 1;
+  const quantity = Number(match[1]);
+  return Number.isInteger(quantity) && quantity > 0 ? quantity : 1;
+}
+
+function normalizeQuantity(value: string) {
+  const quantity = Number(value);
+  if (!/^\d+$/.test(value) || !Number.isInteger(quantity) || quantity < 1) return "1";
+  return String(Math.min(quantity, 999));
+}
+
+function quantityDisplay(value: string) {
+  const raw = value.trim();
+  if (/^\d+$/.test(raw)) return `${normalizeQuantity(raw)} ×`;
+  return raw || "1 ×";
 }
 
 function parseMoneyInput(value: string) {
@@ -79,7 +93,7 @@ export function ShoppingApp({ userName, familyName, inviteCode, initialCollectPr
   const inviteButtonRef = useRef<HTMLButtonElement>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [name, setName] = useState("");
-  const [quantity, setQuantity] = useState("");
+  const [quantity, setQuantity] = useState("1");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settingSaving, setSettingSaving] = useState(false);
@@ -91,6 +105,10 @@ export function ShoppingApp({ userName, familyName, inviteCode, initialCollectPr
   const [collectPricesOnPurchase, setCollectPricesOnPurchase] = useState(initialCollectPricesOnPurchase);
   const [purchaseItem, setPurchaseItem] = useState<Item | null>(null);
   const [purchasePrice, setPurchasePrice] = useState("");
+  const [editItem, setEditItem] = useState<Item | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editQuantity, setEditQuantity] = useState("1");
+  const [editSaving, setEditSaving] = useState(false);
   const [clearOpen, setClearOpen] = useState(false);
   const [mode, setMode] = useState<"list" | "compare">("list");
 
@@ -142,13 +160,15 @@ export function ShoppingApp({ userName, familyName, inviteCode, initialCollectPr
   }, [loadItems]);
 
   useEffect(() => {
-    if (!inviteOpen && !purchaseItem && !clearOpen) return;
+    if (!inviteOpen && !purchaseItem && !editItem && !clearOpen) return;
 
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key === "Escape") {
         if (purchaseItem) {
           setPurchaseItem(null);
           setPurchasePrice("");
+        } else if (editItem) {
+          setEditItem(null);
         } else if (clearOpen) {
           setClearOpen(false);
         } else {
@@ -160,7 +180,7 @@ export function ShoppingApp({ userName, familyName, inviteCode, initialCollectPr
 
     document.addEventListener("keydown", closeOnEscape);
     return () => document.removeEventListener("keydown", closeOnEscape);
-  }, [inviteOpen, purchaseItem, clearOpen]);
+  }, [inviteOpen, purchaseItem, editItem, clearOpen]);
 
   const pending = useMemo(() => items.filter((item) => !item.completed), [items]);
   const completed = useMemo(() => items.filter((item) => item.completed), [items]);
@@ -200,7 +220,7 @@ export function ShoppingApp({ userName, familyName, inviteCode, initialCollectPr
     try {
       await request("POST", { name, quantity });
       setName("");
-      setQuantity("");
+      setQuantity("1");
       await loadItems(true);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Não foi possível adicionar.");
@@ -241,6 +261,36 @@ export function ShoppingApp({ userName, familyName, inviteCode, initialCollectPr
     setPurchaseItem(null);
     setPurchasePrice("");
     await changeCompleted(item, true, unitPrice);
+  }
+
+  function openEdit(item: Item) {
+    setEditItem(item);
+    setEditName(item.name);
+    setEditQuantity(String(quantityMultiplier(item.quantity)));
+  }
+
+  async function saveItemEdit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editItem || !editName.trim()) return;
+
+    const item = editItem;
+    const nextName = editName.trim();
+    const nextQuantity = normalizeQuantity(editQuantity);
+    setEditSaving(true);
+    setItems((current) => current.map((entry) => entry.id === item.id
+      ? { ...entry, name: nextName, quantity: nextQuantity }
+      : entry));
+
+    try {
+      await request("PATCH", { id: item.id, name: nextName, quantity: nextQuantity });
+      setEditItem(null);
+      await loadItems(true);
+    } catch (editError) {
+      await loadItems(true);
+      setError(editError instanceof Error ? editError.message : "Não foi possível editar o produto.");
+    } finally {
+      setEditSaving(false);
+    }
   }
 
   async function savePriceSetting(next: boolean) {
@@ -374,7 +424,7 @@ export function ShoppingApp({ userName, familyName, inviteCode, initialCollectPr
               <div className="family-setting-row">
                 <div>
                   <strong>Registrar preços durante a compra</strong>
-                  <small>Ao marcar um produto, pergunte o preço de uma unidade.</small>
+                  <small>Ao marcar um produto, pergunte o preço de um pacote ou unidade.</small>
                 </div>
                 <button
                   className={`setting-switch ${collectPricesOnPurchase ? "is-on" : ""}`}
@@ -420,9 +470,9 @@ export function ShoppingApp({ userName, familyName, inviteCode, initialCollectPr
               </button>
               <p>Adicionar ao carrinho</p>
               <h2 id="purchase-title">{purchaseItem.name}</h2>
-              <span className="purchase-quantity">Quantidade: <strong>{purchaseItem.quantity || "1"}</strong></span>
+              <span className="purchase-quantity">Quantidade: <strong>{quantityMultiplier(purchaseItem.quantity)} {quantityMultiplier(purchaseItem.quantity) === 1 ? "item" : "itens"}</strong></span>
               <label className="purchase-price-field">
-                <span>Preço de uma unidade</span>
+                <span>Preço de 1 pacote ou unidade</span>
                 <input
                   value={purchasePrice}
                   onChange={(event) => setPurchasePrice(event.target.value.replace(/[^\d,.]/g, "").slice(0, 15))}
@@ -449,15 +499,79 @@ export function ShoppingApp({ userName, familyName, inviteCode, initialCollectPr
           </div>
         )}
 
+        {editItem && (
+          <div className="invite-modal-backdrop purchase-backdrop" role="presentation" onMouseDown={() => setEditItem(null)}>
+            <form
+              className="purchase-modal edit-item-modal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="edit-item-title"
+              onMouseDown={(event) => event.stopPropagation()}
+              onSubmit={(event) => void saveItemEdit(event)}
+            >
+              <button className="icon-button invite-close" type="button" onClick={() => setEditItem(null)} aria-label="Cancelar edição">
+                <X />
+              </button>
+              <p>Corrigir informações</p>
+              <h2 id="edit-item-title">Editar produto</h2>
+              <label className="edit-product-field">
+                <span>Produto e tamanho</span>
+                <input value={editName} onChange={(event) => setEditName(event.target.value)} maxLength={120} autoComplete="off" autoFocus required />
+              </label>
+              <div className="edit-quantity-field">
+                <span>Quantidade</span>
+                <div className="quantity-stepper">
+                  <button type="button" onClick={() => setEditQuantity((current) => String(Math.max(1, Number(normalizeQuantity(current)) - 1)))} aria-label="Diminuir quantidade">
+                    <Minus />
+                  </button>
+                  <input
+                    value={editQuantity}
+                    onChange={(event) => setEditQuantity(event.target.value.replace(/\D/g, "").slice(0, 3))}
+                    onBlur={() => setEditQuantity((current) => normalizeQuantity(current))}
+                    type="text"
+                    inputMode="numeric"
+                    aria-label="Quantidade de pacotes ou unidades"
+                  />
+                  <button type="button" onClick={() => setEditQuantity((current) => String(Math.min(999, Number(normalizeQuantity(current)) + 1)))} aria-label="Aumentar quantidade">
+                    <Plus />
+                  </button>
+                </div>
+                <small>Pacotes ou unidades</small>
+              </div>
+              <button className="primary-button" type="submit" disabled={editSaving || !editName.trim()}>
+                {editSaving ? <LoaderCircle className="spin" /> : <Check />}
+                Salvar alterações
+              </button>
+            </form>
+          </div>
+        )}
+
         <form className="add-form" onSubmit={submit}>
           <label className="product-field">
             <span>O que está faltando?</span>
-            <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Ex.: leite, arroz, sabonete..." maxLength={120} autoComplete="off" required />
+            <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Ex.: Arroz 5 kg" maxLength={120} autoComplete="off" required />
+            <small className="field-hint">Inclua o peso ou tamanho no nome</small>
           </label>
-          <label className="quantity-field">
+          <div className="quantity-field">
             <span>Quantidade</span>
-            <input value={quantity} onChange={(event) => setQuantity(event.target.value)} placeholder="Ex.: 2 un." maxLength={40} autoComplete="off" />
-          </label>
+            <div className="quantity-stepper">
+              <button type="button" onClick={() => setQuantity((current) => String(Math.max(1, Number(normalizeQuantity(current)) - 1)))} aria-label="Diminuir quantidade">
+                <Minus />
+              </button>
+              <input
+                value={quantity}
+                onChange={(event) => setQuantity(event.target.value.replace(/\D/g, "").slice(0, 3))}
+                onBlur={() => setQuantity((current) => normalizeQuantity(current))}
+                type="text"
+                inputMode="numeric"
+                aria-label="Quantidade de pacotes ou unidades"
+              />
+              <button type="button" onClick={() => setQuantity((current) => String(Math.min(999, Number(normalizeQuantity(current)) + 1)))} aria-label="Aumentar quantidade">
+                <Plus />
+              </button>
+            </div>
+            <small className="field-hint">Pacotes ou unidades</small>
+          </div>
           <button className="primary-button add-button" type="submit" disabled={saving || !name.trim()}>
             {saving ? <LoaderCircle className="spin" /> : <Plus />}
             Adicionar
@@ -490,7 +604,7 @@ export function ShoppingApp({ userName, familyName, inviteCode, initialCollectPr
                 <div className="all-done"><Check /> Tudo comprado!</div>
               ) : (
                 <ul className="items-list">
-                  {pending.map((item) => <ItemRow key={item.id} item={item} busy={busyId === item.id} showPriceStatus={collectPricesOnPurchase} onToggle={toggleItem} onRemove={removeItem} />)}
+                  {pending.map((item) => <ItemRow key={item.id} item={item} busy={busyId === item.id} showPriceStatus={collectPricesOnPurchase} onToggle={toggleItem} onEdit={openEdit} onRemove={removeItem} />)}
                 </ul>
               )}
             </section>
@@ -509,7 +623,7 @@ export function ShoppingApp({ userName, familyName, inviteCode, initialCollectPr
                   <button className="clear-button" type="button" onClick={() => setClearOpen(true)}>Limpar comprados</button>
                 </div>
                 <ul className="items-list">
-                  {completed.map((item) => <ItemRow key={item.id} item={item} busy={busyId === item.id} showPriceStatus={collectPricesOnPurchase || hasCompletedPrices} onToggle={toggleItem} onRemove={removeItem} />)}
+                  {completed.map((item) => <ItemRow key={item.id} item={item} busy={busyId === item.id} showPriceStatus={collectPricesOnPurchase || hasCompletedPrices} onToggle={toggleItem} onEdit={openEdit} onRemove={removeItem} />)}
                 </ul>
               </section>
             )}
@@ -541,7 +655,7 @@ export function ShoppingApp({ userName, familyName, inviteCode, initialCollectPr
   );
 }
 
-function ItemRow({ item, busy, showPriceStatus, onToggle, onRemove }: { item: Item; busy: boolean; showPriceStatus: boolean; onToggle: (item: Item) => void; onRemove: (id: string) => void }) {
+function ItemRow({ item, busy, showPriceStatus, onToggle, onEdit, onRemove }: { item: Item; busy: boolean; showPriceStatus: boolean; onToggle: (item: Item) => void; onEdit: (item: Item) => void; onRemove: (id: string) => void }) {
   const total = itemTotal(item);
 
   return (
@@ -551,10 +665,10 @@ function ItemRow({ item, busy, showPriceStatus, onToggle, onRemove }: { item: It
       </button>
       <div className="item-copy">
         <div className="item-main-line">
-          <div className="item-description">{item.quantity && <span>{item.quantity}</span>}<strong>{item.name}</strong></div>
+          <div className="item-description"><span>{quantityDisplay(item.quantity)}</span><strong>{item.name}</strong></div>
           {item.completed && item.unitPrice !== null && total !== null && (
-            <div className="item-price" aria-label={`${formatCurrency(item.unitPrice)} por unidade; total ${formatCurrency(total)}`}>
-              <span>{formatCurrency(item.unitPrice)}/un.</span>
+            <div className="item-price" aria-label={`${formatCurrency(item.unitPrice)} por pacote ou unidade; total ${formatCurrency(total)}`}>
+              <span>{formatCurrency(item.unitPrice)} cada</span>
               <strong>{formatCurrency(total)}</strong>
             </div>
           )}
@@ -564,7 +678,10 @@ function ItemRow({ item, busy, showPriceStatus, onToggle, onRemove }: { item: It
           {item.completed && item.unitPrice === null && showPriceStatus ? " · Preço não informado" : ""}
         </small>
       </div>
-      <button className="icon-button delete-button" type="button" onClick={() => onRemove(item.id)} aria-label={`Excluir ${item.name}`} disabled={busy}><Trash2 /></button>
+      <div className="item-actions">
+        {!item.completed && <button className="icon-button edit-button" type="button" onClick={() => onEdit(item)} aria-label={`Editar ${item.name}`} disabled={busy}><Pencil /></button>}
+        <button className="icon-button delete-button" type="button" onClick={() => onRemove(item.id)} aria-label={`Excluir ${item.name}`} disabled={busy}><Trash2 /></button>
+      </div>
     </li>
   );
 }

@@ -56,6 +56,91 @@ body {
   font-family: "Aptos", "Segoe UI", system-ui, -apple-system, sans-serif;
 }
 
+body.splash-active {
+  overflow: hidden;
+}
+
+.app-splash {
+  position: fixed;
+  z-index: 9999;
+  inset: 0;
+  display: grid;
+  min-width: 320px;
+  min-height: 100dvh;
+  place-items: center;
+  padding:
+    calc(1.5rem + env(safe-area-inset-top))
+    calc(1.5rem + env(safe-area-inset-right))
+    calc(1.5rem + env(safe-area-inset-bottom))
+    calc(1.5rem + env(safe-area-inset-left));
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.14), transparent 28rem),
+    radial-gradient(circle at 88% 88%, rgba(242, 120, 59, 0.2), transparent 24rem),
+    linear-gradient(145deg, #0a8c75 0%, #087f6a 48%, #075e51 100%);
+  color: #ffffff;
+  opacity: 1;
+  transition: opacity 220ms ease, visibility 220ms ease;
+}
+
+.app-splash-leaving {
+  visibility: hidden;
+  opacity: 0;
+}
+
+.app-splash-content {
+  display: grid;
+  justify-items: center;
+  gap: 1rem;
+  animation: splash-content-in 480ms cubic-bezier(0.2, 0.78, 0.25, 1) both;
+}
+
+.app-splash-mark {
+  display: grid;
+  width: 5.75rem;
+  height: 5.75rem;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow:
+    0 1.25rem 3rem rgba(4, 54, 45, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(0.45rem);
+}
+
+.app-splash-mark svg {
+  width: 2.85rem;
+  height: 2.85rem;
+  stroke-width: 1.85;
+}
+
+.app-splash strong {
+  font-size: clamp(1.55rem, 6vw, 2rem);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  text-shadow: 0 0.35rem 1.3rem rgba(4, 54, 45, 0.28);
+}
+
+@keyframes splash-content-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.55rem) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-splash,
+  .app-splash-content {
+    animation: none;
+    transition: none;
+  }
+}
+
 button,
 input {
   font: inherit;
@@ -181,7 +266,7 @@ button:disabled {
   height: 2.75rem;
   place-items: center;
   border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 0.9rem;
+  border-radius: 999px;
   background: rgba(255, 255, 255, 0.12);
 }
 
@@ -490,7 +575,7 @@ button:disabled {
   height: 3rem;
   place-items: center;
   border: 1px solid rgba(255, 255, 255, 0.24);
-  border-radius: 1rem;
+  border-radius: 999px;
   background: rgba(255, 255, 255, 0.13);
 }
 
@@ -909,6 +994,39 @@ button:disabled {
   margin-top: 0.65rem;
 }
 
+.edit-product-field,
+.edit-quantity-field {
+  display: grid;
+  gap: 0.42rem;
+  margin-top: 1rem;
+}
+
+.edit-product-field > span,
+.edit-quantity-field > span {
+  color: var(--muted-foreground);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.edit-product-field input {
+  width: 100%;
+  height: 3rem;
+  border: 1px solid var(--input);
+  border-radius: 0.85rem;
+  padding: 0 0.85rem;
+  background: var(--card);
+  color: var(--foreground);
+}
+
+.edit-quantity-field small {
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+}
+
+.edit-item-modal > .primary-button {
+  margin-top: 1.1rem;
+}
+
 .clear-modal {
   text-align: center;
 }
@@ -944,6 +1062,74 @@ button:disabled {
   border-radius: 1.2rem;
   padding: 0.95rem;
   background: var(--muted);
+}
+
+.quantity-field {
+  display: grid;
+  gap: 0.42rem;
+}
+
+.quantity-field > span {
+  color: var(--muted-foreground);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.field-hint {
+  min-height: 0.95rem;
+  color: var(--muted-foreground);
+  font-size: 0.72rem;
+  line-height: 1.3;
+}
+
+.quantity-stepper {
+  display: grid;
+  grid-template-columns: 2.6rem minmax(2.5rem, 1fr) 2.6rem;
+  height: 3rem;
+  overflow: hidden;
+  border: 1px solid var(--input);
+  border-radius: 0.85rem;
+  background: var(--card);
+}
+
+.quantity-stepper button {
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: var(--secondary);
+  color: var(--primary);
+  cursor: pointer;
+}
+
+.quantity-stepper button:hover {
+  filter: brightness(0.97);
+}
+
+.quantity-stepper button:first-child {
+  border-right: 1px solid var(--input);
+}
+
+.quantity-stepper button:last-child {
+  border-left: 1px solid var(--input);
+}
+
+.quantity-stepper button svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.add-form .quantity-stepper input,
+.edit-quantity-field .quantity-stepper input {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  padding: 0 0.25rem;
+  background: var(--card);
+  color: var(--foreground);
+  font-weight: 800;
+  text-align: center;
 }
 
 .add-button {
@@ -1137,6 +1323,17 @@ button:disabled {
 
 .item-row.is-completed .item-description strong {
   text-decoration: line-through;
+}
+
+.item-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.08rem;
+}
+
+.edit-button:hover {
+  background: var(--secondary);
+  color: var(--primary);
 }
 
 .delete-button:hover {
@@ -1717,7 +1914,7 @@ button:disabled {
   }
 
   .add-form {
-    grid-template-columns: minmax(0, 1fr) 7.5rem;
+    grid-template-columns: minmax(0, 1fr) 8.25rem;
   }
 
   .add-button {
