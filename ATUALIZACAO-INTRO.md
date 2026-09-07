@@ -6,6 +6,7 @@ Esta versão inclui uma tela de abertura leve para o Lista de Casa.
 
 - Aparece ao abrir ou atualizar completamente o aplicativo.
 - Exibe o carrinho e o nome `Lista de Casa` sobre o verde da marca.
+- Usa um ícone adaptável com cantos bem arredondados na abertura nativa do Android.
 - Desaparece suavemente em menos de um segundo.
 - Não reaparece ao alternar entre a lista, o comparador e as configurações.
 - Respeita as áreas seguras de celulares Android e iPhone.
@@ -16,6 +17,10 @@ Esta versão inclui uma tela de abertura leve para o Lista de Casa.
 - Não adiciona imagens, vídeos ou bibliotecas.
 - Não altera as funcionalidades existentes.
 - Não exige comando SQL nem atualização no banco Neon.
+
+## Atualizar o ícone instalado
+
+Depois que a Vercel concluir a publicação, remova o atalho ou aplicativo instalado no Android e instale-o novamente pelo Chrome. O Android guarda uma cópia do ícone usado na instalação anterior, por isso apenas atualizar a página pode continuar mostrando a versão quadrada.
 
 ## Publicação
 

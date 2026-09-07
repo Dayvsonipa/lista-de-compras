@@ -4,7 +4,7 @@ Sistema web de lista de compras compartilhada para famílias.
 
 ## O que já está pronto
 
-- Tela de abertura leve e adaptada às áreas seguras de Android e iPhone.
+- Tela de abertura leve, com ícone arredondado e adaptada às áreas seguras de Android e iPhone.
 - Cadastro com nome, e-mail e senha.
 - Login e sessão segura por cookie HTTP-only.
 - Senhas protegidas com `scrypt` e salt individual.
