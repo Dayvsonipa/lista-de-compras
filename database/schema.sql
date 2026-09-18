@@ -31,9 +31,21 @@ CREATE TABLE IF NOT EXISTS family_invites (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS shopping_categories (
+  id UUID PRIMARY KEY,
+  family_id UUID NOT NULL REFERENCES families(id) ON DELETE CASCADE,
+  name VARCHAR(60) NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_by UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS shopping_items (
   id UUID PRIMARY KEY,
   family_id UUID NOT NULL REFERENCES families(id) ON DELETE CASCADE,
+  category_id UUID REFERENCES shopping_categories(id) ON DELETE SET NULL,
   name VARCHAR(120) NOT NULL,
   quantity VARCHAR(40) NOT NULL DEFAULT '',
   unit_price NUMERIC(12, 2),
@@ -42,6 +54,7 @@ CREATE TABLE IF NOT EXISTS shopping_items (
   completed_by UUID REFERENCES users(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   completed_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT shopping_items_unit_price_nonnegative CHECK (unit_price IS NULL OR unit_price >= 0)
 );
 
@@ -60,6 +73,13 @@ CREATE INDEX IF NOT EXISTS idx_family_invites_family_expiry
 
 CREATE INDEX IF NOT EXISTS idx_shopping_items_family_status_created
   ON shopping_items (family_id, completed, created_at DESC);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_shopping_categories_family_name
+  ON shopping_categories (family_id, LOWER(name))
+  WHERE active = TRUE;
+
+CREATE INDEX IF NOT EXISTS idx_shopping_categories_family_order
+  ON shopping_categories (family_id, active, sort_order, name);
 
 CREATE INDEX IF NOT EXISTS idx_sessions_user_expiry
   ON sessions (user_id, expires_at);

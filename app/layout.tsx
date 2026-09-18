@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { AppSplash } from "@/components/app-splash";
+import { ServiceWorkerRegister } from "@/components/service-worker-register";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -35,6 +36,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <body>
+        <ServiceWorkerRegister />
         <AppSplash />
         {children}
       </body>

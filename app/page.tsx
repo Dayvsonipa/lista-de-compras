@@ -12,6 +12,7 @@ export default async function Home() {
   return (
     <ShoppingApp
       userName={user.name}
+      familyId={user.familyId}
       familyName={user.familyName}
       inviteCode={user.inviteCode}
       initialCollectPricesOnPurchase={user.collectPricesOnPurchase}

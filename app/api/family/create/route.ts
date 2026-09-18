@@ -32,10 +32,27 @@ export async function POST(request: Request) {
         SELECT id, ${user.id}, 'owner'
         FROM created_family
         RETURNING family_id
-      )
+      ),
+      created_invite AS (
       INSERT INTO family_invites (id, family_id, code, created_by, expires_at)
       SELECT ${inviteId}, family_id, ${inviteCode}, ${user.id}, NOW() + INTERVAL '1 year'
       FROM created_member
+      RETURNING family_id
+      )
+      INSERT INTO shopping_categories (id, family_id, name, sort_order, created_by)
+      SELECT random_id, family_id, category_name, sort_order, ${user.id}
+      FROM created_invite
+      CROSS JOIN (
+        VALUES
+          (${randomUUID()}::uuid, 'Hortifruti', 10),
+          (${randomUUID()}::uuid, 'Açougue', 20),
+          (${randomUUID()}::uuid, 'Padaria', 30),
+          (${randomUUID()}::uuid, 'Laticínios', 40),
+          (${randomUUID()}::uuid, 'Mercearia', 50),
+          (${randomUUID()}::uuid, 'Bebidas', 60),
+          (${randomUUID()}::uuid, 'Limpeza', 70),
+          (${randomUUID()}::uuid, 'Higiene', 80)
+      ) AS defaults(random_id, category_name, sort_order)
     `;
 
     return Response.json({ ok: true, inviteCode });

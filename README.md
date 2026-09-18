@@ -11,6 +11,8 @@ Sistema web de lista de compras compartilhada para famílias.
 - Criação de família.
 - Entrada na família por código de 8 caracteres.
 - Uma lista compartilhada por família.
+- Categorias personalizadas por família, com criação, edição e remoção.
+- Produtos agrupados por setor do supermercado.
 - Identificação de quem adicionou e de quem comprou.
 - Quantidade numérica de pacotes ou unidades, com controles de aumentar e diminuir.
 - Edição do nome e da quantidade antes de marcar o produto como comprado.
@@ -20,7 +22,10 @@ Sistema web de lista de compras compartilhada para famílias.
 - Comparação de preços entre 2 ou 3 produtos.
 - Cálculo automático do preço por mL e por litro.
 - Comparação de garrafas, latas e pacotes com várias unidades.
-- Atualização automática da lista a cada 8 segundos.
+- Funcionamento offline depois da primeira sincronização.
+- Alterações offline salvas no celular e enviadas ao servidor quando a conexão retorna.
+- Indicador de modo offline, horário da última atualização e alterações pendentes.
+- Atualização automática enquanto o aplicativo está aberto e ao recuperar a conexão.
 - Tema claro e escuro com preferência salva no celular.
 - Interface responsiva para celular, tablet e computador.
 - Instalação como aplicativo no Android, com ícone próprio e abertura sem a barra de endereço.
@@ -61,11 +66,25 @@ Abra http://localhost:3000.
 
 Se o sistema já estiver publicado, execute no SQL Editor do Neon o arquivo:
 
+Execute as migrações que ainda não foram aplicadas, sempre em ordem. Para esta versão, depois da migração de preços, execute:
+
 ```text
-database/migrations/002_purchase_price_settings.sql
+database/migrations/003_categories_and_offline_sync.sql
 ```
 
-Ele adiciona a configuração familiar e o preço unitário sem apagar usuários, famílias ou produtos. O passo a passo completo está em `ATUALIZACAO-PRECO.md`.
+Ela cria as categorias e os campos de sincronização sem apagar usuários, famílias, preços ou produtos. O passo a passo completo está em `ATUALIZACAO-CATEGORIAS-OFFLINE.md`.
+
+## Categorias
+
+Abra **Família → Categorias de produtos** para criar, renomear ou remover categorias. As famílias existentes recebem automaticamente: Hortifruti, Açougue, Padaria, Laticínios, Mercearia, Bebidas, Limpeza e Higiene.
+
+Ao adicionar ou editar um produto, selecione seu setor. A área **Para comprar** será agrupada por categoria; produtos antigos permanecem em **Sem categoria** até serem editados.
+
+## Funcionamento offline
+
+Depois que a lista for aberta uma vez com internet, o aplicativo guarda no aparelho a interface, as categorias e a lista atual. Sem conexão, é possível adicionar, editar, excluir e marcar produtos normalmente. As operações ficam em uma fila local e são enviadas em ordem quando o aplicativo recupera a conexão.
+
+O aplicativo informa quando está offline, o horário da última sincronização e quantas alterações aguardam envio. Se dois integrantes estiverem offline ao mesmo tempo, cada celular verá suas próprias alterações até ambos voltarem à internet.
 
 ## Registrar preços durante a compra
 
@@ -137,6 +156,17 @@ Depois de publicar a versão mais recente na Vercel:
 4. Confirme a instalação como **Lista de Casa**.
 
 Ao abrir pelo novo ícone, o sistema funciona em modo aplicativo, sem exibir a barra de endereço. Se já havia um atalho antigo, remova-o e instale novamente para que o Android reconheça o novo PWA.
+
+## Instalar no iPhone
+
+1. Abra o endereço publicado diretamente no **Safari**.
+2. Toque no botão **Compartilhar**.
+3. Escolha **Adicionar à Tela de Início**.
+4. Mantenha ativada a opção **Abrir como App**, quando ela aparecer.
+5. Confirme em **Adicionar**.
+6. Abra o Lista de Casa pelo novo ícone e aguarde a primeira sincronização com internet.
+
+Depois desse primeiro acesso, a lista poderá ser aberta sem conexão. No iPhone, a sincronização em segundo plano não é garantida pelo sistema; por isso o aplicativo sincroniza ao abrir, ao voltar para a tela e quando detecta que a internet retornou.
 
 ## Segurança
 
