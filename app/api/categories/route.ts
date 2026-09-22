@@ -123,6 +123,12 @@ export async function DELETE(request: Request) {
         AND category_id = ${body.id}
     `;
     await sql`
+      UPDATE family_products
+      SET category_id = NULL, updated_at = NOW()
+      WHERE family_id = ${auth.user.familyId}
+        AND category_id = ${body.id}
+    `;
+    await sql`
       UPDATE shopping_categories
       SET active = FALSE, updated_at = NOW()
       WHERE id = ${body.id}

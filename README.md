@@ -13,12 +13,17 @@ Sistema web de lista de compras compartilhada para famílias.
 - Uma lista compartilhada por família.
 - Categorias personalizadas por família, com criação, edição e remoção.
 - Produtos agrupados por setor do supermercado.
+- Catálogo de produtos da família com sugestões dos itens já utilizados.
 - Identificação de quem adicionou e de quem comprou.
 - Quantidade numérica de pacotes ou unidades, com controles de aumentar e diminuir.
 - Edição do nome e da quantidade antes de marcar o produto como comprado.
 - Configuração familiar para registrar ou não preços durante a compra.
 - Preço unitário opcional ao marcar um produto como comprado.
 - Cálculo automático por quantidade e total dos produtos no carrinho.
+- Histórico permanente das compras finalizadas, preparado para relatórios.
+- Comparação do preço unitário atual com a última compra do mesmo produto.
+- Indicador verde para queda de preço e vermelho para aumento, com percentual.
+- Interface em português, inglês e espanhol, com preferência individual por usuário.
 - Comparação de preços entre 2 ou 3 produtos.
 - Cálculo automático do preço por mL e por litro.
 - Comparação de garrafas, latas e pacotes com várias unidades.
@@ -66,13 +71,21 @@ Abra http://localhost:3000.
 
 Se o sistema já estiver publicado, execute no SQL Editor do Neon o arquivo:
 
-Execute as migrações que ainda não foram aplicadas, sempre em ordem. Para esta versão, depois da migração de preços, execute:
+Execute as migrações que ainda não foram aplicadas, sempre em ordem. Para esta versão, depois das migrações de preços, execute:
 
 ```text
 database/migrations/003_categories_and_offline_sync.sql
+database/migrations/004_product_catalog_and_purchase_history.sql
+database/migrations/005_user_language.sql
 ```
 
-Ela cria as categorias e os campos de sincronização sem apagar usuários, famílias, preços ou produtos. O passo a passo completo está em `ATUALIZACAO-CATEGORIAS-OFFLINE.md`.
+Elas criam as categorias, a sincronização offline, o catálogo familiar, o histórico de compras e a preferência individual de idioma sem apagar usuários, famílias, preços ou produtos. Abra cada arquivo, copie o conteúdo SQL e cole no Neon; não cole apenas o caminho do arquivo. O passo a passo do idioma está em `ATUALIZACAO-IDIOMAS.md`.
+
+## Idioma do aplicativo
+
+Na lista, abra **Configurações → Idioma do aplicativo** e escolha Português, English ou Español. A preferência fica ligada à conta do usuário: integrantes da mesma família podem usar idiomas diferentes. A escolha também é guardada no aparelho e pode ser feita offline; quando a conexão retornar, o aplicativo sincronizará a preferência com a conta.
+
+Os nomes dos produtos, das famílias e das categorias criadas pelos usuários permanecem exatamente como foram digitados. Apenas a interface e as mensagens do sistema são traduzidas.
 
 ## Categorias
 
@@ -94,7 +107,10 @@ O criador da família pode abrir **Família** e ativar **Registrar preços duran
 2. Ao marcar um produto como comprado, o aplicativo solicita o preço de uma unidade.
 3. O sistema multiplica o preço pela quantidade cadastrada.
 4. O produto permanece em **No carrinho** mostrando preço unitário e total calculado.
-5. O total da compra fica visível até alguém escolher **Limpar comprados**.
+5. O total da compra fica visível até alguém escolher **Finalizar compra**.
+6. Ao finalizar, os itens saem da lista, mas ficam preservados no histórico da família.
+
+Na próxima compra, selecione o produto sugerido pelo catálogo. Quando o novo preço unitário for informado, o aplicativo mostrará `▼` verde se o preço caiu, `▲` vermelho se aumentou ou `—` se permaneceu igual, além da variação percentual. A comparação começa com as compras finalizadas nesta versão; itens apagados em versões antigas não podem ser recuperados.
 
 A quantidade é um número inteiro de pacotes ou unidades. Registros antigos como `2 un.` ou `2 pacotes` continuam sendo reconhecidos; textos de peso, como `5 kg`, são tratados como uma unidade até serem corrigidos pelo botão de edição.
 

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Calculator, Check, RotateCcw, Trophy } from "lucide-react";
+import { AppLanguage, formatCurrency, localeFor, translate } from "@/lib/i18n";
 
 type Unit = "ml" | "l";
 
@@ -38,17 +39,8 @@ function parseNumber(value: string) {
   return Number.isFinite(number) && number > 0 ? number : 0;
 }
 
-function currency(value: number) {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
-}
-
-function perMl(value: number) {
-  return new Intl.NumberFormat("pt-BR", {
+function perMl(value: number, language: AppLanguage) {
+  return new Intl.NumberFormat(localeFor(language), {
     style: "currency",
     currency: "BRL",
     minimumFractionDigits: 4,
@@ -56,7 +48,8 @@ function perMl(value: number) {
   }).format(value);
 }
 
-export function PriceComparator() {
+export function PriceComparator({ language }: { language: AppLanguage }) {
+  const t = (key: Parameters<typeof translate>[1], values?: Record<string, string | number>) => translate(language, key, values);
   const [count, setCount] = useState<2 | 3>(2);
   const [products, setProducts] = useState<Product[]>([
     emptyProduct(),
@@ -112,20 +105,20 @@ export function PriceComparator() {
       <div className="comparator-heading">
         <div className="comparator-icon"><Calculator /></div>
         <div>
-          <p>Economize no supermercado</p>
-          <h2 id="comparator-title">Comparar preços</h2>
-          <span>Descubra qual embalagem tem o menor preço por mililitro.</span>
+          <p>{t("comparatorEyebrow")}</p>
+          <h2 id="comparator-title">{t("comparePrices")}</h2>
+          <span>{t("comparatorDescription")}</span>
         </div>
       </div>
 
       <div className="comparison-count">
-        <span>Quantos produtos deseja comparar?</span>
-        <div role="group" aria-label="Quantidade de produtos">
+        <span>{t("howManyProducts")}</span>
+        <div role="group" aria-label={t("productCountLabel")}>
           <button type="button" className={count === 2 ? "active" : ""} onClick={() => setCount(2)}>
-            {count === 2 && <Check />} 2 produtos
+            {count === 2 && <Check />} {t("twoProducts")}
           </button>
           <button type="button" className={count === 3 ? "active" : ""} onClick={() => setCount(3)}>
-            {count === 3 && <Check />} 3 produtos
+            {count === 3 && <Check />} {t("threeProducts")}
           </button>
         </div>
       </div>
@@ -138,13 +131,13 @@ export function PriceComparator() {
           return (
             <article className={`comparison-product ${isWinner ? "winner" : ""}`} key={index}>
               <div className="product-number">
-                <span>Produto {index + 1}</span>
-                {isWinner && <strong><Trophy /> Melhor compra</strong>}
+                <span>{t("productNumber", { number: index + 1 })}</span>
+                {isWinner && <strong><Trophy /> {t("bestBuy")}</strong>}
               </div>
 
               <div className="comparison-fields">
                 <label className="comparison-field-row">
-                  <span>Preço total</span>
+                  <span>{t("totalPrice")}</span>
                   <div className="money-input">
                     <span>R$</span>
                     <input
@@ -152,40 +145,40 @@ export function PriceComparator() {
                       onChange={(event) => update(index, "price", event.target.value)}
                       placeholder="0,00"
                       inputMode="decimal"
-                      aria-label={`Preço total do produto ${index + 1}`}
+                      aria-label={t("productTotalPrice", { number: index + 1 })}
                     />
                   </div>
                 </label>
 
                 <label className="comparison-field-row">
-                  <span>Quantidade</span>
+                  <span>{t("quantity")}</span>
                   <div className="volume-input">
                     <input
                       value={product.volume}
                       onChange={(event) => update(index, "volume", event.target.value)}
                       placeholder="0"
                       inputMode="decimal"
-                      aria-label={`Volume do produto ${index + 1}`}
+                      aria-label={t("productVolume", { number: index + 1 })}
                     />
                     <select
                       value={product.unit}
                       onChange={(event) => update(index, "unit", event.target.value as Unit)}
-                      aria-label={`Unidade de volume do produto ${index + 1}`}
+                      aria-label={t("volumeUnit", { number: index + 1 })}
                     >
                       <option value="ml">mL</option>
-                      <option value="l">Litros</option>
+                      <option value="l">{t("liters")}</option>
                     </select>
                   </div>
                 </label>
 
                 <label className="comparison-field-row">
-                  <span>Unidades no pacote</span>
+                  <span>{t("unitsInPackage")}</span>
                   <input
                     value={product.amount}
                     onChange={(event) => update(index, "amount", event.target.value.replace(/\D/g, "").slice(0, 3))}
                     placeholder="1"
                     inputMode="numeric"
-                    aria-label={`Quantidade de unidades do produto ${index + 1}`}
+                    aria-label={t("productUnits", { number: index + 1 })}
                   />
                 </label>
               </div>
@@ -193,12 +186,12 @@ export function PriceComparator() {
               <div className="product-result">
                 {result ? (
                   <>
-                    <div><span>Preço por litro</span><strong>{currency(result.pricePerLiter)}</strong></div>
-                    <div><span>Preço por mL</span><strong>{perMl(result.pricePerMl)}</strong></div>
-                    <small>Volume total comparado: {result.totalMl.toLocaleString("pt-BR")} mL</small>
+                    <div><span>{t("pricePerLiter")}</span><strong>{formatCurrency(result.pricePerLiter, language)}</strong></div>
+                    <div><span>{t("pricePerMl")}</span><strong>{perMl(result.pricePerMl, language)}</strong></div>
+                    <small>{t("comparedVolume", { volume: result.totalMl.toLocaleString(localeFor(language)) })}</small>
                   </>
                 ) : (
-                  <p>Preencha o preço e o volume para calcular.</p>
+                  <p>{t("fillComparator")}</p>
                 )}
               </div>
             </article>
@@ -210,19 +203,19 @@ export function PriceComparator() {
         <div className="comparison-winner" aria-live="polite">
           <span><Trophy /></span>
           <div>
-            <p>Melhor custo-benefício</p>
-            <h3>Produto {winner.index + 1}</h3>
+            <p>{t("bestValue")}</p>
+            <h3>{t("productNumber", { number: winner.index + 1 })}</h3>
             <strong>
               {savings > 0.01
-                ? `${savings.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% mais barato por mL que a próxima opção.`
-                : "Os produtos têm praticamente o mesmo preço por mL."}
+                ? t("cheaperThanNext", { percent: savings.toLocaleString(localeFor(language), { maximumFractionDigits: 1 }) })
+                : t("almostSamePrice")}
             </strong>
           </div>
         </div>
       )}
 
       <button className="reset-comparison" type="button" onClick={reset}>
-        <RotateCcw /> Limpar comparação
+        <RotateCcw /> {t("clearComparison")}
       </button>
     </section>
   );

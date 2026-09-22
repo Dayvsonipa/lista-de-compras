@@ -3,10 +3,11 @@ import { createSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { hashPassword } from "@/lib/password";
 import { cleanText, isValidEmail, isValidPassword, normalizeEmail } from "@/lib/validation";
+import { isAppLanguage } from "@/lib/i18n";
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as { name?: string; email?: string; password?: string };
+    const body = (await request.json()) as { name?: string; email?: string; password?: string; preferredLanguage?: unknown };
     const name = cleanText(body.name, 100);
     const email = normalizeEmail(body.email);
 
@@ -21,10 +22,11 @@ export async function POST(request: Request) {
     }
 
     const userId = randomUUID();
+    const preferredLanguage = isAppLanguage(body.preferredLanguage) ? body.preferredLanguage : "pt-BR";
     const sql = db();
     await sql`
-      INSERT INTO users (id, name, email, password_hash)
-      VALUES (${userId}, ${name}, ${email}, ${hashPassword(body.password!)})
+      INSERT INTO users (id, name, email, password_hash, preferred_language)
+      VALUES (${userId}, ${name}, ${email}, ${hashPassword(body.password!)}, ${preferredLanguage})
     `;
 
     await createSession(userId);

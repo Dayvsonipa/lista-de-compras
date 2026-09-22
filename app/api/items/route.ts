@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { getSessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { cleanText } from "@/lib/validation";
+import { cleanText, normalizeProductName } from "@/lib/validation";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -51,16 +51,19 @@ export async function GET() {
         si.name,
         si.quantity,
         si.category_id,
+        si.product_id,
         si.unit_price,
         si.completed,
         si.created_at,
         si.completed_at,
         si.updated_at,
+        fp.last_unit_price AS previous_unit_price,
         added.name AS added_by_name,
         completed.name AS completed_by_name
       FROM shopping_items si
       JOIN users added ON added.id = si.added_by
       LEFT JOIN users completed ON completed.id = si.completed_by
+      LEFT JOIN family_products fp ON fp.id = si.product_id
       WHERE si.family_id = ${auth.user.familyId}
       ORDER BY si.completed ASC, si.created_at DESC
       LIMIT 300
@@ -72,6 +75,8 @@ export async function GET() {
         name: String(row.name),
         quantity: String(row.quantity ?? ""),
         categoryId: row.category_id ? String(row.category_id) : null,
+        productId: row.product_id ? String(row.product_id) : null,
+        previousUnitPrice: row.previous_unit_price === null ? null : Number(row.previous_unit_price),
         unitPrice: row.unit_price === null ? null : Number(row.unit_price),
         completed: Boolean(row.completed),
         createdAt: String(row.created_at),
@@ -92,7 +97,7 @@ export async function POST(request: Request) {
     const auth = await familyUser();
     if ("error" in auth) return auth.error;
 
-    const body = (await request.json()) as { id?: string; name?: string; quantity?: string; categoryId?: string | null };
+    const body = (await request.json()) as { id?: string; productId?: string; name?: string; quantity?: string; categoryId?: string | null };
     const name = cleanText(body.name, 120);
     const quantity = parseItemQuantity(body.quantity);
     const categoryId = typeof body.categoryId === "string" && UUID_PATTERN.test(body.categoryId) ? body.categoryId : null;
@@ -100,6 +105,7 @@ export async function POST(request: Request) {
     if (!quantity) return Response.json({ error: "Informe uma quantidade entre 1 e 999." }, { status: 400 });
 
     const id = typeof body.id === "string" && UUID_PATTERN.test(body.id) ? body.id : randomUUID();
+    const requestedProductId = typeof body.productId === "string" && UUID_PATTERN.test(body.productId) ? body.productId : randomUUID();
     const sql = db();
     if (categoryId) {
       const categoryRows = await sql`
@@ -109,9 +115,20 @@ export async function POST(request: Request) {
       `;
       if (categoryRows.length === 0) return Response.json({ error: "Categoria inválida." }, { status: 400 });
     }
+    const productRows = await sql`
+      INSERT INTO family_products (id, family_id, name, normalized_name, category_id)
+      VALUES (${requestedProductId}, ${auth.user.familyId}, ${name}, ${normalizeProductName(name)}, ${categoryId})
+      ON CONFLICT (family_id, normalized_name) DO UPDATE
+      SET name = EXCLUDED.name,
+          category_id = COALESCE(EXCLUDED.category_id, family_products.category_id),
+          updated_at = NOW()
+      RETURNING id
+    `;
+    const productId = String(productRows[0].id);
+
     await sql`
-      INSERT INTO shopping_items (id, family_id, category_id, name, quantity, added_by)
-      VALUES (${id}, ${auth.user.familyId}, ${categoryId}, ${name}, ${quantity}, ${auth.user.id})
+      INSERT INTO shopping_items (id, family_id, category_id, product_id, name, quantity, added_by)
+      VALUES (${id}, ${auth.user.familyId}, ${categoryId}, ${productId}, ${name}, ${quantity}, ${auth.user.id})
       ON CONFLICT (id) DO NOTHING
     `;
 
@@ -126,7 +143,7 @@ export async function PATCH(request: Request) {
     const auth = await familyUser();
     if ("error" in auth) return auth.error;
 
-    const body = (await request.json()) as { id?: string; name?: string; quantity?: string; categoryId?: string | null; completed?: boolean; unitPrice?: string | number | null };
+    const body = (await request.json()) as { id?: string; productId?: string; name?: string; quantity?: string; categoryId?: string | null; completed?: boolean; unitPrice?: string | number | null };
     if (typeof body.id !== "string") {
       return Response.json({ error: "Alteração inválida." }, { status: 400 });
     }
@@ -137,6 +154,7 @@ export async function PATCH(request: Request) {
       const name = cleanText(body.name, 120);
       const quantity = parseItemQuantity(body.quantity);
       const categoryId = typeof body.categoryId === "string" && UUID_PATTERN.test(body.categoryId) ? body.categoryId : null;
+      const requestedProductId = typeof body.productId === "string" && UUID_PATTERN.test(body.productId) ? body.productId : randomUUID();
       if (!name) return Response.json({ error: "Informe o produto." }, { status: 400 });
       if (!quantity) return Response.json({ error: "Informe uma quantidade entre 1 e 999." }, { status: 400 });
 
@@ -149,9 +167,20 @@ export async function PATCH(request: Request) {
         if (categoryRows.length === 0) return Response.json({ error: "Categoria inválida." }, { status: 400 });
       }
 
+      const productRows = await sql`
+        INSERT INTO family_products (id, family_id, name, normalized_name, category_id)
+        VALUES (${requestedProductId}, ${auth.user.familyId}, ${name}, ${normalizeProductName(name)}, ${categoryId})
+        ON CONFLICT (family_id, normalized_name) DO UPDATE
+        SET name = EXCLUDED.name,
+            category_id = COALESCE(EXCLUDED.category_id, family_products.category_id),
+            updated_at = NOW()
+        RETURNING id
+      `;
+      const productId = String(productRows[0].id);
+
       const rows = await sql`
         UPDATE shopping_items
-        SET name = ${name}, quantity = ${quantity}, category_id = ${categoryId}, updated_at = NOW()
+        SET name = ${name}, quantity = ${quantity}, category_id = ${categoryId}, product_id = ${productId}, updated_at = NOW()
         WHERE id = ${body.id}
           AND family_id = ${auth.user.familyId}
           AND completed = FALSE
@@ -202,12 +231,7 @@ export async function DELETE(request: Request) {
     const sql = db();
 
     if (body.clearCompleted) {
-      await sql`
-        DELETE FROM shopping_items
-        WHERE family_id = ${auth.user.familyId}
-          AND completed = TRUE
-      `;
-      return Response.json({ ok: true });
+      return Response.json({ error: "Atualize o aplicativo e use Finalizar compra para preservar o histórico." }, { status: 409 });
     }
 
     if (typeof body.id !== "string") {
@@ -218,6 +242,7 @@ export async function DELETE(request: Request) {
       DELETE FROM shopping_items
       WHERE id = ${body.id}
         AND family_id = ${auth.user.familyId}
+        AND completed = FALSE
     `;
     return Response.json({ ok: true });
   } catch {

@@ -4,12 +4,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { Eye, EyeOff, LoaderCircle, ShoppingBasket } from "lucide-react";
+import { useAppLanguage } from "./language";
+import { AppLanguage, languageOptions, translateServerMessage } from "@/lib/i18n";
 
 export function AuthForm({ mode }: { mode: "login" | "register" }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const { language, setLanguage, t } = useAppLanguage("pt-BR", true);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -21,7 +24,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
     const confirmation = String(form.get("confirmation") ?? "");
 
     if (mode === "register" && password !== confirmation) {
-      setError("As senhas não são iguais.");
+      setError(t("passwordsMismatch"));
       setLoading(false);
       return;
     }
@@ -34,14 +37,16 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           name: form.get("name"),
           email: form.get("email"),
           password,
+          preferredLanguage: language,
         }),
       });
-      const data = (await response.json()) as { error?: string; redirectTo?: string };
-      if (!response.ok) throw new Error(data.error);
+      const data = (await response.json()) as { error?: string; redirectTo?: string; preferredLanguage?: AppLanguage };
+      if (!response.ok) throw new Error(translateServerMessage(data.error, language, "continueError"));
+      if (data.preferredLanguage) setLanguage(data.preferredLanguage);
       router.push(data.redirectTo ?? "/");
       router.refresh();
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Não foi possível continuar.");
+      setError(submitError instanceof Error ? submitError.message : t("continueError"));
       setLoading(false);
     }
   }
@@ -54,52 +59,58 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         <div className="auth-brand">
           <span><ShoppingBasket /></span>
           <div>
-            <p>Lista compartilhada</p>
-            <strong>Lista de Casa</strong>
+            <p>{t("sharedList")}</p>
+            <strong>{t("appName")}</strong>
           </div>
+          <label className="language-quick-select">
+            <span className="sr-only">{t("language")}</span>
+            <select value={language} onChange={(event) => setLanguage(event.target.value as AppLanguage)} aria-label={t("language")}>
+              {languageOptions.map((option) => <option key={option.value} value={option.value}>{t(option.labelKey)}</option>)}
+            </select>
+          </label>
         </div>
 
         <div className="auth-heading">
-          <h1>{registering ? "Crie sua conta" : "Que bom ter você de volta"}</h1>
+          <h1>{registering ? t("registerTitle") : t("loginTitle")}</h1>
           <p>
             {registering
-              ? "Depois, crie sua família ou entre com o código recebido."
-              : "Entre para abrir a lista compartilhada da sua família."}
+              ? t("registerDescription")
+              : t("loginDescription")}
           </p>
         </div>
 
         <form className="auth-form" onSubmit={submit}>
           {registering && (
             <label>
-              <span>Nome</span>
-              <input name="name" type="text" autoComplete="name" placeholder="Como devemos chamar você?" minLength={2} maxLength={100} required />
+              <span>{t("name")}</span>
+              <input name="name" type="text" autoComplete="name" placeholder={t("namePlaceholder")} minLength={2} maxLength={100} required />
             </label>
           )}
           <label>
-            <span>E-mail</span>
+            <span>{t("email")}</span>
             <input name="email" type="email" inputMode="email" autoComplete="email" placeholder="seuemail@exemplo.com" maxLength={254} required />
           </label>
           <label>
-            <span>Senha</span>
+            <span>{t("password")}</span>
             <div className="password-field">
               <input
                 name="password"
                 type={showPassword ? "text" : "password"}
                 autoComplete={registering ? "new-password" : "current-password"}
-                placeholder={registering ? "Mínimo de 8 caracteres" : "Digite sua senha"}
+                placeholder={registering ? t("passwordMinimum") : t("passwordType")}
                 minLength={8}
                 maxLength={128}
                 required
               />
-              <button type="button" onClick={() => setShowPassword((current) => !current)} aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}>
+              <button type="button" onClick={() => setShowPassword((current) => !current)} aria-label={showPassword ? t("hidePassword") : t("showPassword")}>
                 {showPassword ? <EyeOff /> : <Eye />}
               </button>
             </div>
           </label>
           {registering && (
             <label>
-              <span>Confirme a senha</span>
-              <input name="confirmation" type={showPassword ? "text" : "password"} autoComplete="new-password" placeholder="Digite a senha novamente" minLength={8} maxLength={128} required />
+              <span>{t("confirmPassword")}</span>
+              <input name="confirmation" type={showPassword ? "text" : "password"} autoComplete="new-password" placeholder={t("repeatPassword")} minLength={8} maxLength={128} required />
             </label>
           )}
 
@@ -107,14 +118,14 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
 
           <button className="primary-button" type="submit" disabled={loading}>
             {loading && <LoaderCircle className="spin" />}
-            {registering ? "Criar minha conta" : "Entrar"}
+            {registering ? t("createAccount") : t("login")}
           </button>
         </form>
 
         <p className="auth-switch">
-          {registering ? "Já possui uma conta?" : "Ainda não possui uma conta?"}{" "}
+          {registering ? t("alreadyAccount") : t("noAccount")}{" "}
           <Link href={registering ? "/entrar" : "/cadastro"}>
-            {registering ? "Entrar" : "Criar conta"}
+            {registering ? t("login") : t("createAccountShort")}
           </Link>
         </p>
       </section>

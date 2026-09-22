@@ -14,7 +14,7 @@ export async function POST(request: Request) {
 
     const sql = db();
     const rows = await sql`
-      SELECT id, password_hash
+      SELECT id, password_hash, preferred_language
       FROM users
       WHERE email = ${email}
       LIMIT 1
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     }
 
     await createSession(String(rows[0].id));
-    return Response.json({ ok: true, redirectTo: "/" });
+    return Response.json({ ok: true, redirectTo: "/", preferredLanguage: String(rows[0].preferred_language ?? "pt-BR") });
   } catch {
     return Response.json({ error: "Não foi possível entrar agora." }, { status: 500 });
   }

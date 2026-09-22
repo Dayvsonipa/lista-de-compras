@@ -1,4 +1,4 @@
-const CACHE_NAME = "lista-de-casa-v3";
+const CACHE_NAME = "lista-de-casa-v5";
 const STATIC_ASSETS = [
   "/manifest.webmanifest",
   "/favicon.svg",

@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { db } from "./db";
+import { AppLanguage, isAppLanguage } from "./i18n";
 
 const COOKIE_NAME = "lista_de_casa_session";
 const SESSION_DAYS = 30;
@@ -14,6 +15,7 @@ export type SessionUser = {
   role: "owner" | "member" | null;
   inviteCode: string | null;
   collectPricesOnPurchase: boolean;
+  preferredLanguage: AppLanguage;
 };
 
 function tokenHash(token: string) {
@@ -64,6 +66,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
       u.id,
       u.name,
       u.email,
+      u.preferred_language,
       fm.family_id,
       f.name AS family_name,
       f.collect_prices_on_purchase,
@@ -97,5 +100,6 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     role: row.role === "owner" || row.role === "member" ? row.role : null,
     inviteCode: row.invite_code ? String(row.invite_code) : null,
     collectPricesOnPurchase: Boolean(row.collect_prices_on_purchase),
+    preferredLanguage: isAppLanguage(row.preferred_language) ? row.preferred_language : "pt-BR",
   };
 }

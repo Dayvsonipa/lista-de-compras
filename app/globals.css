@@ -294,6 +294,44 @@ button:disabled {
   font-size: 1.2rem;
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
+.language-quick-select {
+  margin-left: auto;
+}
+
+.language-quick-select select,
+.language-setting-row select {
+  min-width: 7.2rem;
+  height: 2.6rem;
+  border: 1px solid var(--input);
+  border-radius: 0.75rem;
+  padding: 0 1.9rem 0 0.65rem;
+  background: var(--card);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.language-quick-select select {
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+.language-quick-select option {
+  color: #111;
+}
+
 .auth-heading h1 {
   margin: 0 0 0.5rem;
   font-size: clamp(1.55rem, 6vw, 2rem);
@@ -851,6 +889,10 @@ button:disabled {
   margin-top: 0.22rem;
 }
 
+.language-setting-row select {
+  flex: 0 0 auto;
+}
+
 .setting-switch {
   position: relative;
   flex: 0 0 auto;
@@ -1075,6 +1117,55 @@ button:disabled {
   background: var(--card);
   color: var(--foreground);
   font: inherit;
+}
+
+.product-autocomplete {
+  position: relative;
+}
+
+.product-suggestions {
+  position: absolute;
+  z-index: 30;
+  top: 4.95rem;
+  right: 0;
+  left: 0;
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 0.85rem;
+  background: var(--card);
+  box-shadow: 0 16px 34px rgba(17, 57, 49, 0.18);
+}
+
+.product-suggestions button {
+  display: grid;
+  gap: 0.12rem;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  padding: 0.65rem 0.78rem;
+  background: var(--card);
+  color: var(--foreground);
+  cursor: pointer;
+  text-align: left;
+}
+
+.product-suggestions button:last-child {
+  border-bottom: 0;
+}
+
+.product-suggestions button:hover,
+.product-suggestions button:focus-visible {
+  background: var(--secondary);
+}
+
+.product-suggestions span {
+  font-size: 0.86rem;
+  font-weight: 750;
+}
+
+.product-suggestions small {
+  color: var(--muted-foreground);
+  font-size: 0.7rem;
 }
 
 .sync-banner {
@@ -1555,6 +1646,44 @@ button:disabled {
   color: var(--primary);
   font-size: 0.9rem;
   font-weight: 800;
+}
+
+.item-price-total {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+
+.item-price-total > strong {
+  color: var(--primary);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.price-trend {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.12rem 0.34rem;
+  font-size: 0.68rem;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.price-trend.is-down {
+  background: color-mix(in srgb, #16a34a 14%, var(--card));
+  color: #15803d;
+}
+
+.price-trend.is-up {
+  background: color-mix(in srgb, #dc2626 13%, var(--card));
+  color: #dc2626;
+}
+
+.price-trend.is-same {
+  background: var(--muted);
+  color: var(--muted-foreground);
 }
 
 .item-copy small {

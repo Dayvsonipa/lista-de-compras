@@ -3,11 +3,14 @@
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { ArrowRight, Home, KeyRound, LoaderCircle, Users } from "lucide-react";
+import { useAppLanguage } from "./language";
+import { AppLanguage, translateServerMessage } from "@/lib/i18n";
 
-export function FamilySetup({ firstName }: { firstName: string }) {
+export function FamilySetup({ firstName, initialLanguage }: { firstName: string; initialLanguage: AppLanguage }) {
   const router = useRouter();
   const [busy, setBusy] = useState<"create" | "join" | null>(null);
   const [error, setError] = useState("");
+  const { language, t } = useAppLanguage(initialLanguage);
 
   async function submit(event: FormEvent<HTMLFormElement>, action: "create" | "join") {
     event.preventDefault();
@@ -22,11 +25,11 @@ export function FamilySetup({ firstName }: { firstName: string }) {
         body: JSON.stringify(action === "create" ? { name: form.get("name") } : { code: form.get("code") }),
       });
       const data = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(data.error);
+      if (!response.ok) throw new Error(translateServerMessage(data.error, language, "continueError"));
       router.push("/");
       router.refresh();
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "Não foi possível continuar.");
+      setError(submitError instanceof Error ? submitError.message : t("continueError"));
       setBusy(null);
     }
   }
@@ -36,9 +39,9 @@ export function FamilySetup({ firstName }: { firstName: string }) {
       <section className="family-container">
         <div className="family-heading">
           <span className="family-heading-icon"><Home /></span>
-          <p>Olá, {firstName}!</p>
-          <h1>Vamos conectar sua casa</h1>
-          <span>Escolha uma das opções abaixo. Você fará isso apenas uma vez.</span>
+          <p>{t("familyHello", { name: firstName })}</p>
+          <h1>{t("familyTitle")}</h1>
+          <span>{t("familyDescription")}</span>
         </div>
 
         {error && <p className="family-error" role="alert">{error}</p>}
@@ -46,26 +49,26 @@ export function FamilySetup({ firstName }: { firstName: string }) {
         <div className="family-options">
           <form className="family-option" onSubmit={(event) => void submit(event, "create")}>
             <div className="option-icon"><Users /></div>
-            <h2>Criar uma família</h2>
-            <p>Você receberá um código para convidar outras pessoas.</p>
+            <h2>{t("createFamily")}</h2>
+            <p>{t("createFamilyDescription")}</p>
             <label>
-              <span>Nome da família</span>
-              <input name="name" placeholder="Ex.: Família Silva" minLength={2} maxLength={100} required />
+              <span>{t("familyName")}</span>
+              <input name="name" placeholder={t("familyPlaceholder")} minLength={2} maxLength={100} required />
             </label>
             <button className="primary-button" type="submit" disabled={busy !== null}>
               {busy === "create" ? <LoaderCircle className="spin" /> : <ArrowRight />}
-              Criar família
+              {t("createFamily")}
             </button>
           </form>
 
-          <div className="family-divider"><span>ou</span></div>
+          <div className="family-divider"><span>{t("or")}</span></div>
 
           <form className="family-option" onSubmit={(event) => void submit(event, "join")}>
             <div className="option-icon orange"><KeyRound /></div>
-            <h2>Entrar em uma família</h2>
-            <p>Use o código enviado por quem criou a família.</p>
+            <h2>{t("joinFamily")}</h2>
+            <p>{t("joinFamilyDescription")}</p>
             <label>
-              <span>Código do convite</span>
+              <span>{t("inviteCode")}</span>
               <input
                 className="code-input"
                 name="code"
@@ -82,7 +85,7 @@ export function FamilySetup({ firstName }: { firstName: string }) {
             </label>
             <button className="secondary-button" type="submit" disabled={busy !== null}>
               {busy === "join" ? <LoaderCircle className="spin" /> : <ArrowRight />}
-              Entrar com o código
+              {t("joinWithCode")}
             </button>
           </form>
         </div>

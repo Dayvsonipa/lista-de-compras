@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { ShoppingBasket } from "lucide-react";
+import { useAppLanguage } from "./language";
 
 const SPLASH_VISIBLE_MS = 700;
 const SPLASH_REMOVE_MS = 980;
 
 export function AppSplash() {
+  const { t } = useAppLanguage("pt-BR", true);
   const [leaving, setLeaving] = useState(false);
   const [visible, setVisible] = useState(true);
 
@@ -34,13 +36,13 @@ export function AppSplash() {
       className={`app-splash${leaving ? " app-splash-leaving" : ""}`}
       role="status"
       aria-live="polite"
-      aria-label="Abrindo Lista de Casa"
+      aria-label={t("openingApp")}
     >
       <div className="app-splash-content">
         <span className="app-splash-mark" aria-hidden="true">
           <ShoppingBasket />
         </span>
-        <strong>Lista de Casa</strong>
+        <strong>{t("appName")}</strong>
       </div>
     </div>
   );

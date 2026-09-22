@@ -11,5 +11,5 @@ export default async function FamilyPage() {
   if (!user) redirect("/entrar");
   if (user.familyId) redirect("/");
 
-  return <FamilySetup firstName={user.name.split(/\s+/)[0]} />;
+  return <FamilySetup firstName={user.name.split(/\s+/)[0]} initialLanguage={user.preferredLanguage} />;
 }

@@ -2,15 +2,26 @@
 
 export type OfflineItem = {
   id: string;
+  productId: string | null;
   name: string;
   quantity: string;
   categoryId: string | null;
+  previousUnitPrice: number | null;
   unitPrice: number | null;
   completed: boolean;
   addedBy: string;
   completedBy: string | null;
   createdAt: string;
   completedAt: string | null;
+  updatedAt: string;
+};
+
+export type OfflineProduct = {
+  id: string;
+  name: string;
+  categoryId: string | null;
+  lastUnitPrice: number | null;
+  lastPurchasedAt: string | null;
   updatedAt: string;
 };
 
@@ -25,13 +36,14 @@ export type OfflineSnapshot = {
   familyId: string;
   items: OfflineItem[];
   categories: OfflineCategory[];
+  products: OfflineProduct[];
   syncedAt: string | null;
 };
 
 export type PendingMutation = {
   mutationId: string;
   familyId: string;
-  endpoint: "/api/items" | "/api/categories";
+  endpoint: "/api/items" | "/api/categories" | "/api/purchases/complete" | "/api/user/settings";
   method: "POST" | "PATCH" | "DELETE";
   body: Record<string, unknown>;
   createdAt: string;
@@ -84,7 +96,19 @@ async function runStore<T>(
 export async function getOfflineSnapshot(familyId: string) {
   return runStore<OfflineSnapshot | null>(SNAPSHOTS, "readonly", (store, resolve, reject) => {
     const request = store.get(familyId);
-    request.onsuccess = () => resolve((request.result as OfflineSnapshot | undefined) ?? null);
+    request.onsuccess = () => {
+      const result = request.result as OfflineSnapshot | undefined;
+      if (!result) return resolve(null);
+      resolve({
+        ...result,
+        products: result.products ?? [],
+        items: (result.items ?? []).map((item) => ({
+          ...item,
+          productId: item.productId ?? null,
+          previousUnitPrice: item.previousUnitPrice ?? null,
+        })),
+      });
+    };
     request.onerror = () => reject(request.error);
   });
 }
