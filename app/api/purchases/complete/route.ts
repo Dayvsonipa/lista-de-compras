@@ -94,7 +94,26 @@ export async function POST(request: Request) {
     `;
 
     return Response.json({ ok: true, archived: selected.length });
-  } catch {
-    return Response.json({ error: "Não foi possível arquivar esta compra." }, { status: 500 });
-  }
+  } catch (error) {
+  const detalhe = error as {
+    message?: string;
+    code?: string;
+    table?: string;
+    column?: string;
+    constraint?: string;
+  };
+
+  console.error("Erro ao finalizar compra:", {
+    mensagem: detalhe?.message,
+    codigo: detalhe?.code,
+    tabela: detalhe?.table,
+    coluna: detalhe?.column,
+    restricao: detalhe?.constraint,
+  });
+
+  return Response.json(
+    { error: "Não foi possível arquivar esta compra." },
+    { status: 500 }
+  );
+}
 }
