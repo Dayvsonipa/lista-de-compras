@@ -5,6 +5,25 @@ import { cleanText, normalizeProductName } from "@/lib/validation";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+function logItemsError(method: string, error: unknown, stage?: string) {
+  const detail = error as {
+    message?: string;
+    code?: string;
+    table?: string;
+    column?: string;
+    constraint?: string;
+  } | null;
+
+  console.error(`Erro em ${method} /api/items:`, {
+    etapa: stage,
+    mensagem: detail?.message ?? "Erro sem mensagem disponível",
+    codigo: detail?.code,
+    tabela: detail?.table,
+    coluna: detail?.column,
+    restricao: detail?.constraint,
+  });
+}
+
 function parsePrice(value: unknown) {
   if (value === null || value === undefined) return null;
 
@@ -87,16 +106,19 @@ export async function GET() {
       })),
       collectPricesOnPurchase: auth.user.collectPricesOnPurchase,
     });
-  } catch {
+  } catch (error) {
+    logItemsError("GET", error);
     return Response.json({ error: "Não foi possível carregar a lista." }, { status: 500 });
   }
 }
 
 export async function POST(request: Request) {
+  let stage = "autenticar usuário";
   try {
     const auth = await familyUser();
     if ("error" in auth) return auth.error;
 
+    stage = "ler e validar dados";
     const body = (await request.json()) as { id?: string; productId?: string; name?: string; quantity?: string; categoryId?: string | null };
     const name = cleanText(body.name, 120);
     const quantity = parseItemQuantity(body.quantity);
@@ -106,8 +128,10 @@ export async function POST(request: Request) {
 
     const id = typeof body.id === "string" && UUID_PATTERN.test(body.id) ? body.id : randomUUID();
     const requestedProductId = typeof body.productId === "string" && UUID_PATTERN.test(body.productId) ? body.productId : randomUUID();
+    stage = "preparar conexão com o banco";
     const sql = db();
     if (categoryId) {
+      stage = "validar categoria";
       const categoryRows = await sql`
         SELECT id FROM shopping_categories
         WHERE id = ${categoryId} AND family_id = ${auth.user.familyId} AND active = TRUE
@@ -115,6 +139,7 @@ export async function POST(request: Request) {
       `;
       if (categoryRows.length === 0) return Response.json({ error: "Categoria inválida." }, { status: 400 });
     }
+    stage = "salvar produto em family_products";
     const productRows = await sql`
       INSERT INTO family_products (id, family_id, name, normalized_name, category_id)
       VALUES (${requestedProductId}, ${auth.user.familyId}, ${name}, ${normalizeProductName(name)}, ${categoryId})
@@ -124,8 +149,10 @@ export async function POST(request: Request) {
           updated_at = NOW()
       RETURNING id
     `;
+    stage = "obter identificador do produto";
     const productId = String(productRows[0].id);
 
+    stage = "inserir item em shopping_items";
     await sql`
       INSERT INTO shopping_items (id, family_id, category_id, product_id, name, quantity, added_by)
       VALUES (${id}, ${auth.user.familyId}, ${categoryId}, ${productId}, ${name}, ${quantity}, ${auth.user.id})
@@ -133,7 +160,8 @@ export async function POST(request: Request) {
     `;
 
     return Response.json({ ok: true, id }, { status: 201 });
-  } catch {
+  } catch (error) {
+    logItemsError("POST", error, stage);
     return Response.json({ error: "Não foi possível adicionar o produto." }, { status: 500 });
   }
 }
@@ -217,7 +245,8 @@ export async function PATCH(request: Request) {
 
     if (rows.length === 0) return Response.json({ error: "Produto não encontrado." }, { status: 404 });
     return Response.json({ ok: true });
-  } catch {
+  } catch (error) {
+    logItemsError("PATCH", error);
     return Response.json({ error: "Não foi possível atualizar o produto." }, { status: 500 });
   }
 }
@@ -245,7 +274,8 @@ export async function DELETE(request: Request) {
         AND completed = FALSE
     `;
     return Response.json({ ok: true });
-  } catch {
+  } catch (error) {
+    logItemsError("DELETE", error);
     return Response.json({ error: "Não foi possível remover o produto." }, { status: 500 });
   }
 }
