@@ -7,6 +7,7 @@ import {
   LoaderCircle, LogOut, Minus, Moon, Pencil, Plus, RefreshCw, Settings,
   ShoppingBasket, Sun, Tags, Trash2, Users, X,
 } from "lucide-react";
+import itemStyles from "./shopping-item.module.css";
 import { PriceComparator } from "./price-comparator";
 import { useAppLanguage } from "./language";
 import {
@@ -90,6 +91,21 @@ export function ShoppingApp({ userName, familyId, familyName, inviteCode, initia
   const [quantity, setQuantity] = useState("1");
   const [categoryId, setCategoryId] = useState("");
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  const [generalSuggestions, setGeneralSuggestions] = useState<Product[]>([]);
+  const [selectedGlobalId, setSelectedGlobalId] = useState<string | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      if (name.trim().length < 2 || !navigator.onLine) { setGeneralSuggestions([]); return; }
+      try {
+        const response = await fetch(`/api/catalog?q=${encodeURIComponent(name.trim())}`, { signal: controller.signal, cache: "no-store" });
+        if (!response.ok) { setGeneralSuggestions([]); return; }
+        const data = await response.json() as { products?: Product[] };
+        if (!controller.signal.aborted) setGeneralSuggestions(data.products ?? []);
+      } catch { if (!controller.signal.aborted) setGeneralSuggestions([]); }
+    }, 250);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [name]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settingSaving, setSettingSaving] = useState(false);
@@ -256,10 +272,12 @@ export function ShoppingApp({ userName, familyId, familyName, inviteCode, initia
   const productSuggestions = useMemo(() => {
     const query = normalizeProductName(name);
     if (query.length < 2) return [];
-    return products
-      .filter((product) => normalizeProductName(product.name).includes(query))
-      .slice(0, 5);
-  }, [name, products]);
+    const familyMatches = products.filter((product) => normalizeProductName(product.name).includes(query));
+    const generalMatches = generalSuggestions.filter((product) =>
+      normalizeProductName(product.name).includes(query) && !products.some((own) =>
+        own.globalProductId === product.id || normalizeProductName(own.name) === normalizeProductName(product.name)));
+    return [...familyMatches.slice(0, 5), ...generalMatches.slice(0, 3)];
+  }, [name, products, generalSuggestions]);
   const pendingGroups = useMemo(() => {
     const groups = categories.map((category) => ({ id: category.id, name: category.name, items: pending.filter((item) => item.categoryId === category.id) }));
     const uncategorized = pending.filter((item) => !item.categoryId || !categoryMap.has(item.categoryId));
@@ -315,10 +333,11 @@ export function ShoppingApp({ userName, familyId, familyName, inviteCode, initia
     const previousItems = itemsRef.current;
     const previousProducts = productsRef.current;
     const normalizedName = normalizeProductName(name);
-    const existingProduct = previousProducts.find((product) => normalizeProductName(product.name) === normalizedName);
+    const existingProduct = previousProducts.find((product) => (selectedGlobalId && product.globalProductId === selectedGlobalId) || normalizeProductName(product.name) === normalizedName);
     const productId = existingProduct?.id ?? crypto.randomUUID();
     const nextProducts = existingProduct ? previousProducts.map((product) => product.id === existingProduct.id ? { ...product, name: name.trim(), categoryId: categoryId || product.categoryId, updatedAt: timestamp } : product) : [{
       id: productId,
+      globalProductId: selectedGlobalId,
       name: name.trim(),
       categoryId: categoryId || null,
       lastUnitPrice: null,
@@ -333,9 +352,11 @@ export function ShoppingApp({ userName, familyId, familyName, inviteCode, initia
     };
     commitItemsAndProducts([item, ...previousItems], nextProducts);
     setName("");
+    setSelectedGlobalId(null);
+    setGeneralSuggestions([]);
     setQuantity("1");
     try {
-      await performMutation("/api/items", "POST", { id: item.id, productId: item.productId, name: item.name, quantity: item.quantity, categoryId: item.categoryId });
+      await performMutation("/api/items", "POST", { id: item.id, productId: item.productId, globalProductId: selectedGlobalId, name: item.name, quantity: item.quantity, categoryId: item.categoryId });
     } catch (submitError) {
       commitItemsAndProducts(previousItems, previousProducts);
       setError(submitError instanceof Error ? submitError.message : t("addError"));
@@ -387,8 +408,8 @@ export function ShoppingApp({ userName, familyId, familyName, inviteCode, initia
     const nextCategoryId = editCategoryId || null;
     const previousItems = itemsRef.current;
     const previousProducts = productsRef.current;
-    const existingProduct = previousProducts.find((product) => normalizeProductName(product.name) === normalizeProductName(nextName));
-    const nextProductId = existingProduct?.id ?? crypto.randomUUID();
+    const existingProduct = previousProducts.find((product) => product.id === item.productId);
+    const nextProductId = item.productId ?? crypto.randomUUID();
     const nextProducts = existingProduct ? previousProducts.map((product) => product.id === existingProduct.id ? { ...product, name: nextName, categoryId: nextCategoryId || product.categoryId, updatedAt: nowIso() } : product) : [{
       id: nextProductId,
       name: nextName,
@@ -404,7 +425,7 @@ export function ShoppingApp({ userName, familyId, familyName, inviteCode, initia
       name: nextName,
       quantity: nextQuantity,
       categoryId: nextCategoryId,
-      previousUnitPrice: existingProduct?.lastUnitPrice ?? null,
+      previousUnitPrice: existingProduct?.lastUnitPrice ?? item.previousUnitPrice,
       updatedAt: nowIso(),
     } : entry), nextProducts);
     setEditItem(null);
@@ -635,7 +656,7 @@ export function ShoppingApp({ userName, familyId, familyName, inviteCode, initia
           {editItem && <div className="invite-modal-backdrop purchase-backdrop" role="presentation" onMouseDown={() => setEditItem(null)}>
             <form className="purchase-modal edit-item-modal" role="dialog" aria-modal="true" aria-labelledby="edit-item-title" onMouseDown={(event) => event.stopPropagation()} onSubmit={(event) => void saveItemEdit(event)}>
               <button className="icon-button invite-close" type="button" onClick={() => setEditItem(null)} aria-label={t("cancelEdit")}><X /></button>
-              <p>{t("correctInformation")}</p><h2 id="edit-item-title">{t("editProduct")}</h2>
+              <p>{t("editIdentityHint")}</p><h2 id="edit-item-title">{t("editProduct")}</h2>
               <label className="edit-product-field"><span>{t("productAndSize")}</span><input value={editName} onChange={(event) => setEditName(event.target.value)} maxLength={120} autoComplete="off" autoFocus required /></label>
               <label className="edit-product-field"><span>{t("category")}</span><select value={editCategoryId} onChange={(event) => setEditCategoryId(event.target.value)}><option value="">{t("noCategory")}</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
               <div className="edit-quantity-field"><span>{t("quantity")}</span><div className="quantity-stepper"><button type="button" onClick={() => setEditQuantity((current) => String(Math.max(1, Number(normalizeQuantity(current)) - 1)))} aria-label={t("decreaseQuantity")}><Minus /></button><input value={editQuantity} onChange={(event) => setEditQuantity(event.target.value.replace(/\D/g, "").slice(0, 3))} onBlur={() => setEditQuantity((current) => normalizeQuantity(current))} type="text" inputMode="numeric" aria-label={t("packageQuantity")} /><button type="button" onClick={() => setEditQuantity((current) => String(Math.min(999, Number(normalizeQuantity(current)) + 1)))} aria-label={t("increaseQuantity")}><Plus /></button></div><small>{t("packagesOrUnits")}</small></div>
@@ -644,8 +665,8 @@ export function ShoppingApp({ userName, familyId, familyName, inviteCode, initia
           </div>}
 
           <form className="add-form category-add-form" onSubmit={(event) => void submit(event)}>
-            <label className="product-field product-autocomplete"><span>{t("whatIsMissing")}</span><input value={name} onFocus={() => setSuggestionsOpen(true)} onBlur={() => window.setTimeout(() => setSuggestionsOpen(false), 120)} onChange={(event) => { const nextName = event.target.value; setName(nextName); const match = productsRef.current.find((product) => normalizeProductName(product.name) === normalizeProductName(nextName)); if (match?.categoryId) setCategoryId(match.categoryId); setSuggestionsOpen(true); }} placeholder={t("productExample")} maxLength={120} autoComplete="off" required />
-              {suggestionsOpen && productSuggestions.length > 0 && <div className="product-suggestions" role="listbox" aria-label={t("purchasedProducts")}>{productSuggestions.map((product) => <button key={product.id} type="button" role="option" aria-selected={normalizeProductName(product.name) === normalizeProductName(name)} onMouseDown={(event) => { event.preventDefault(); setName(product.name); if (product.categoryId) setCategoryId(product.categoryId); setSuggestionsOpen(false); }}><span>{product.name}</span><small>{product.lastUnitPrice === null ? t("noPreviousPrice") : t("lastPrice", { price: currency(product.lastUnitPrice) })}</small></button>)}</div>}
+            <label className="product-field product-autocomplete"><span>{t("whatIsMissing")}</span><input value={name} onFocus={() => setSuggestionsOpen(true)} onBlur={() => window.setTimeout(() => setSuggestionsOpen(false), 120)} onChange={(event) => { const nextName = event.target.value; setName(nextName); setSelectedGlobalId(null); const match = productsRef.current.find((product) => normalizeProductName(product.name) === normalizeProductName(nextName)); if (match?.categoryId) setCategoryId(match.categoryId); setSuggestionsOpen(true); }} placeholder={t("productExample")} maxLength={120} autoComplete="off" required />
+              {suggestionsOpen && productSuggestions.length > 0 && <div className="product-suggestions" role="listbox" aria-label={t("purchasedProducts")}>{productSuggestions.map((product) => <button key={product.id} type="button" role="option" aria-selected={normalizeProductName(product.name) === normalizeProductName(name)} onMouseDown={(event) => { event.preventDefault(); setName(product.name); setSelectedGlobalId(product.source === "global" ? product.id : null); if (product.categoryId) setCategoryId(product.categoryId); setSuggestionsOpen(false); }}><span>{product.name}</span><small>{product.source === "global" ? t("generalCatalog") : product.lastUnitPrice === null ? t("noPreviousPrice") : t("lastPrice", { price: currency(product.lastUnitPrice) })}</small></button>)}</div>}
               <small className="field-hint">{t("includeSize")}</small>
             </label>
             <label className="category-field"><span>{t("category")}</span><select value={categoryId} onChange={(event) => setCategoryId(event.target.value)}><option value="">{t("noCategory")}</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select><small className="field-hint">{t("marketSection")}</small></label>
@@ -685,11 +706,11 @@ function ItemRow({ item, language, busy, categoryName, showPriceStatus, onToggle
   const currentCents = item.unitPrice === null ? null : Math.round(item.unitPrice * 100);
   const previousCents = item.previousUnitPrice === null ? null : Math.round(item.previousUnitPrice * 100);
   const priceDirection = currentCents === null || previousCents === null ? null : currentCents < previousCents ? "down" : currentCents > previousCents ? "up" : "same";
-  const pricePercent = currentCents !== null && previousCents ? Math.round((Math.abs(currentCents - previousCents) / previousCents) * 100) : 0;
-  const trendText = priceDirection === "down" ? t("priceDropped", { percent: pricePercent }) : priceDirection === "up" ? t("priceIncreased", { percent: pricePercent }) : priceDirection === "same" ? t("priceSame") : "";
-  return <li className={`item-row ${item.completed ? "is-completed" : ""}`}>
+  const trendText = priceDirection === "down" ? t("priceDown") : priceDirection === "up" ? t("priceUp") : priceDirection === "same" ? t("priceSame") : "";
+  return <li className={`item-row ${itemStyles.card} ${item.completed ? "is-completed" : ""}`}>
     <button className="check-button" type="button" onClick={() => onToggle(item)} aria-label={item.completed ? t("returnToList", { name: item.name }) : t("markPurchased", { name: item.name })} disabled={busy}>{busy ? <LoaderCircle className="spin" /> : item.completed ? <Check /> : null}</button>
-    <div className="item-copy"><div className="item-main-line"><div className="item-description"><span>{quantityDisplay(item.quantity)}</span><strong>{item.name}</strong></div>{item.completed && item.unitPrice !== null && total !== null && <div className="item-price" aria-label={`${currency(item.unitPrice)}; ${t("purchaseTotal")} ${currency(total)}${trendText ? `; ${trendText}` : ""}`}><span>{currency(item.unitPrice)} {t("each")}</span><div className="item-price-total"><strong>{currency(total)}</strong>{priceDirection && <em className={`price-trend is-${priceDirection}`} title={trendText} aria-label={trendText}>{priceDirection === "down" ? "▼" : priceDirection === "up" ? "▲" : "—"}{priceDirection !== "same" && pricePercent > 0 ? ` ${pricePercent}%` : ""}</em>}</div></div>}</div><small>{categoryName && <em className="item-category">{categoryName}</em>}{item.completed && item.completedBy ? t("purchasedBy", { name: firstName(item.completedBy) }) : t("addedBy", { name: firstName(item.addedBy) })}{!item.completed && item.previousUnitPrice !== null ? ` · ${t("lastShort", { price: currency(item.previousUnitPrice) })}` : ""}{item.completed && item.unitPrice !== null && item.previousUnitPrice === null ? ` · ${t("firstPrice")}` : ""}{item.completed && item.unitPrice === null && showPriceStatus ? ` · ${t("priceNotInformed")}` : ""}</small></div>
-    <div className="item-actions">{!item.completed && <><button className="icon-button edit-button" type="button" onClick={() => onEdit(item)} aria-label={t("edit", { name: item.name })} disabled={busy}><Pencil /></button><button className="icon-button delete-button" type="button" onClick={() => onRemove(item.id)} aria-label={t("delete", { name: item.name })} disabled={busy}><Trash2 /></button></>}</div>
+    <div className="item-copy"><div className="item-main-line"><div className="item-description"><span>{quantityDisplay(item.quantity)}</span><strong>{item.name.replace(/\//g, "/\u200b")}</strong></div>{item.completed && item.unitPrice !== null && total !== null && <div className="item-price" aria-label={`${currency(item.unitPrice)}; ${t("purchaseTotal")} ${currency(total)}${trendText ? `; ${trendText}` : ""}`}><span>{currency(item.unitPrice)} {t("each")}</span><div className="item-price-total"><strong>{currency(total)}</strong>{priceDirection && <em className={`price-trend is-${priceDirection}`} title={trendText} aria-label={trendText}>{priceDirection === "down" ? "▼" : priceDirection === "up" ? "▲" : "—"}</em>}</div></div>}</div>{!item.completed && item.previousUnitPrice !== null && <span className={itemStyles.lastPrice}>{t("lastShort", { price: currency(item.previousUnitPrice) })}</span>}
+      {(item.completed || categoryName) && <small>{categoryName && <em className="item-category">{categoryName}</em>}{item.completed && (item.completedBy ? t("purchasedBy", { name: firstName(item.completedBy) }) : t("addedBy", { name: firstName(item.addedBy) }))}{item.completed && item.unitPrice !== null && item.previousUnitPrice === null ? ` · ${t("firstPrice")}` : ""}{item.completed && item.unitPrice === null && showPriceStatus ? ` · ${t("priceNotInformed")}` : ""}</small>}</div>
+    <div className={!item.completed ? itemStyles.actions : undefined}>{!item.completed && <><div className="item-actions"><button className="icon-button edit-button" type="button" onClick={() => onEdit(item)} aria-label={t("edit", { name: item.name })} disabled={busy}><Pencil /></button><button className="icon-button delete-button" type="button" onClick={() => onRemove(item.id)} aria-label={t("delete", { name: item.name })} disabled={busy}><Trash2 /></button></div><span className={itemStyles.author} title={t("addedBy", { name: item.addedBy })}>{t("addedByShort", { name: firstName(item.addedBy) })}</span></>}</div>
   </li>;
 }

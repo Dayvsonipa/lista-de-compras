@@ -17,6 +17,8 @@ export type OfflineItem = {
 };
 
 export type OfflineProduct = {
+  globalProductId?: string | null;
+  source?: "global";
   id: string;
   name: string;
   categoryId: string | null;

@@ -1,6 +1,11 @@
 export type AppLanguage = "pt-BR" | "en" | "es";
 
 const pt = {
+  priceDown: "Preço caiu em relação à última compra",
+  priceUp: "Preço subiu em relação à última compra",
+  generalCatalog: "Catálogo geral",
+  addedByShort: "Add por {name}",
+  editIdentityHint: "Corrija o nome mantendo o histórico. Para outra marca ou embalagem, adicione um novo produto.",
   appName: "Lista de Casa",
   sharedList: "Lista compartilhada",
   loginTitle: "Que bom ter você de volta",
@@ -203,6 +208,11 @@ type TranslationKey = keyof typeof pt;
 type Dictionary = Record<TranslationKey, string>;
 
 const en: Dictionary = {
+  priceDown: "Price decreased since the last purchase",
+  priceUp: "Price increased since the last purchase",
+  generalCatalog: "General catalog",
+  addedByShort: "By {name}",
+  editIdentityHint: "Correct the name while keeping its history. For another brand or package, add a new product.",
   appName: "Lista de Casa", sharedList: "Shared list", loginTitle: "Welcome back", registerTitle: "Create your account",
   loginDescription: "Sign in to open your family's shared shopping list.", registerDescription: "Next, create your family or join with an invitation code.",
   name: "Name", namePlaceholder: "What should we call you?", email: "Email", password: "Password", passwordMinimum: "At least 8 characters",
@@ -263,6 +273,11 @@ const en: Dictionary = {
 };
 
 const es: Dictionary = {
+  priceDown: "El precio bajó respecto a la última compra",
+  priceUp: "El precio subió respecto a la última compra",
+  generalCatalog: "Catálogo general",
+  addedByShort: "Por {name}",
+  editIdentityHint: "Corrige el nombre conservando su historial. Para otra marca o envase, añade un producto nuevo.",
   appName: "Lista de Casa", sharedList: "Lista compartida", loginTitle: "Qué bueno verte de nuevo", registerTitle: "Crea tu cuenta",
   loginDescription: "Inicia sesión para abrir la lista compartida de tu familia.", registerDescription: "Después, crea tu familia o únete con el código recibido.",
   name: "Nombre", namePlaceholder: "¿Cómo debemos llamarte?", email: "Correo electrónico", password: "Contraseña", passwordMinimum: "Mínimo 8 caracteres",

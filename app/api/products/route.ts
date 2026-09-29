@@ -9,7 +9,7 @@ export async function GET() {
 
     const sql = db();
     const rows = await sql`
-      SELECT id, name, category_id, last_unit_price, last_purchased_at, updated_at
+      SELECT id, global_product_id, name, category_id, last_unit_price, last_purchased_at, updated_at
       FROM family_products
       WHERE family_id = ${user.familyId}
       ORDER BY last_purchased_at DESC NULLS LAST, name ASC
@@ -20,6 +20,7 @@ export async function GET() {
       products: rows.map((row) => ({
         id: String(row.id),
         name: String(row.name),
+        globalProductId: row.global_product_id ? String(row.global_product_id) : null,
         categoryId: row.category_id ? String(row.category_id) : null,
         lastUnitPrice: row.last_unit_price === null ? null : Number(row.last_unit_price),
         lastPurchasedAt: row.last_purchased_at ? String(row.last_purchased_at) : null,

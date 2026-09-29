@@ -1,0 +1,74 @@
+LISTA CASA 1 — ÚLTIMO PREÇO, SETAS E CATÁLOGO GERAL
+
+ORDEM DE INSTALAÇÃO
+1. Extraia este ZIP em uma pasta temporária.
+2. No Neon, abra o SQL Editor do banco usado por este app.
+3. Copie TODO o conteúdo de database/migrations/006_global_product_catalog.sql
+   e execute. Aguarde a conclusão sem erro antes de continuar.
+   A migração pressupõe as tabelas da versão atual (family_products,
+   shopping_items, etc.). Acrescenta tabelas/colunas sem apagar registros.
+4. Copie as pastas app, components, lib e database deste pacote para a raiz
+   do projeto, junto de package.json, mesclando as pastas e substituindo
+   apenas os arquivos de mesmo caminho. Não exclua as pastas existentes.
+5. No GitHub Desktop, confira os arquivos, faça Commit e Push origin.
+6. Aguarde o deploy ficar Ready na Vercel. Feche e reabra/atualize o app.
+   Esta atualização não usa os instaladores .cmd de CSS anteriores.
+
+COMO FUNCIONA
+- A comprar: último preço unitário da família em cinza, sem seta.
+- Add por [primeiro nome] fica abaixo dos botões editar/excluir.
+- Ao marcar comprado e informar preço: seta verde para queda, vermelha
+  para alta, traço neutro para igualdade. Sem percentual.
+- Sem compra anterior ou sem preço atual: sem seta.
+- Ative a opção de informar preços nas configurações da família para que
+  a janela de preço seja exibida ao marcar comprado.
+- O preço de referência fica guardado ao marcar comprado; o último preço
+  do catálogo familiar continua sendo atualizado ao finalizar a compra.
+- Corrigir nome mantém o ID e o histórico. Para outro produto, marca ou
+  embalagem, adicione um novo item em vez de renomear o antigo.
+- Nome que já pertence a outro produto da família gera uma mensagem de
+  conflito, sem unir os históricos automaticamente.
+
+CATÁLOGO GERAL
+- Sugestões da própria família aparecem primeiro; depois, até três
+  sugestões do catálogo geral. Busca inicia com dois caracteres.
+- Inclui 14 sugestões genéricas iniciais (sem preços e sem marcas).
+- Selecionar uma sugestão geral cria/reutiliza o produto da família e
+  guarda a ligação com o identificador geral.
+- A base geral é consultada online. Offline, continuam disponíveis as
+  sugestões familiares já salvas e a fila de sincronização existente.
+- Não há divulgação automática dos nomes particulares das famílias.
+- Cadastros antigos permanecem preservados, sem ligação automática ou
+  fusão por semelhança de nomes.
+- A tabela global_products tem campos para marca, tamanho, unidade,
+  código de barras e tipo de correspondência (generic/exact). Entradas
+  genéricas NÃO identificam embalagens de uma marca específica e não
+  devem ser usadas como equivalência exata em comparação entre mercados.
+- Cadastro administrativo de catálogo, leitura de código de barras,
+  mercados, localização e preços entre mercados são etapas futuras.
+
+CONFERÊNCIA APÓS PUBLICAR
+1. Digite arroz: confira a sugestão Catálogo geral e selecione uma.
+2. Para um produto sem histórico, marque comprado e informe R$ 14,50:
+   não deve haver seta. Finalize a compra.
+3. Adicione o MESMO produto pela sugestão familiar: deve mostrar
+   Último: R$ 14,50 em cinza.
+4. Marque comprado por R$ 12,90: seta verde para baixo.
+5. Antes de finalizar, desmarque e marque por R$ 16,00: seta vermelha.
+6. Desmarque e marque por R$ 14,50: traço cinza.
+7. Confira o produto também no outro aparelho da família.
+8. Corrija o nome de um item a comprar e confira que o histórico permanece.
+
+VALIDAÇÃO REALIZADA
+- TypeScript, ESLint e compilação Next.js.
+- Banco PostgreSQL local via PGlite: migração reaplicável, rotas de itens,
+  isolamento familiar, catálogo, renomeação, conflito e preço-base estável.
+- Renderização dos cards e conferência no Chromium em 320/360/390/720px,
+  incluindo quantidade 999 e nome longo, sem rolagem horizontal.
+- Não foi executado no seu banco Neon nem publicado no seu projeto.
+- A imagem é uma prévia renderizada com dados ilustrativos.
+
+O diagnóstico de erros de /api/items foi mantido. O erro 500 anterior
+continua dependendo dos logs para confirmação da causa.
+Este pacote não substitui a rota /api/purchases/complete, o ícone nem
+app/globals.css; mantém as correções que você já aplicou nesses arquivos.
