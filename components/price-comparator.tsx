@@ -203,7 +203,6 @@ export function PriceComparator({ language }: { language: AppLanguage }) {
                   <>
                     <div><span>{t("pricePerLiter")}</span><strong>{formatCurrency(result.pricePerLiter, language)}</strong></div>
                     <div><span>{t("pricePerMl")}</span><strong>{perMl(result.pricePerMl, language)}</strong></div>
-                    <small>{t("comparedVolume", { volume: result.totalMl.toLocaleString(localeFor(language)) })}</small>
                   </>
                 ) : (
                   <p>{copy.fill}</p>
