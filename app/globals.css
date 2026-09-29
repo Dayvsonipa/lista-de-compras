@@ -2468,3 +2468,32 @@ button:disabled {
   .add-form.category-add-form .add-button { width: 100%; min-height: 48px; margin: 0; }
 }
 /* LISTA-CASA-FORMULARIO-COMPACTO:FIM */
+
+/* LISTA-CASA-CARDS-COMPACTOS:INICIO */
+@media (max-width: 720px) {
+  .item-row {
+    gap: 0.5rem;
+    padding: 0.55rem;
+  }
+  .item-description {
+    gap: 0.3rem;
+  }
+  .item-description > strong {
+    font-size: 0.9375rem;
+    line-height: 1.35;
+    word-break: normal;
+    overflow-wrap: break-word;
+    hyphens: manual;
+  }
+  .item-description > span {
+    font-size: 0.9375rem;
+    line-height: 1.35;
+    white-space: nowrap;
+  }
+  .item-copy > small {
+    font-size: 0.75rem;
+    line-height: 1.35;
+    overflow-wrap: break-word;
+  }
+}
+/* LISTA-CASA-CARDS-COMPACTOS:FIM */
