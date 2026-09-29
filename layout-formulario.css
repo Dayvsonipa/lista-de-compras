@@ -1,0 +1,37 @@
+/* LISTA-CASA-FORMULARIO-COMPACTO:INICIO */
+@media (max-width: 720px) {
+  .add-form.category-add-form {
+    grid-template-columns: minmax(0, 1fr) 128px;
+    align-items: start;
+    gap: 12px;
+    margin-inline: 12px;
+    padding: 14px 12px;
+    border-radius: 20px;
+  }
+  .add-form.category-add-form > .product-field,
+  .add-form.category-add-form > .add-button {
+    grid-column: 1 / -1;
+  }
+  .add-form.category-add-form > .category-field,
+  .add-form.category-add-form > .quantity-field {
+    min-width: 0;
+    display: grid;
+    gap: 6px;
+    grid-template-rows: auto 48px auto;
+  }
+  .add-form.category-add-form > .category-field { grid-column: 1; }
+  .add-form.category-add-form > .quantity-field { grid-column: 2; }
+  .add-form.category-add-form .product-field { min-width: 0; gap: 6px; }
+  .add-form.category-add-form input,
+  .add-form.category-add-form select { font-size: 16px; }
+  .add-form.category-add-form .product-field > input,
+  .add-form.category-add-form select { height: 48px; }
+  .add-form.category-add-form select { padding-inline: 10px 22px; text-overflow: ellipsis; }
+  .add-form.category-add-form .quantity-stepper {
+    height: 48px;
+    grid-template-columns: 40px minmax(0, 1fr) 40px;
+  }
+  .add-form.category-add-form .field-hint { min-height: 0; font-size: 11px; line-height: 1.35; }
+  .add-form.category-add-form .add-button { width: 100%; min-height: 48px; margin: 0; }
+}
+/* LISTA-CASA-FORMULARIO-COMPACTO:FIM */
