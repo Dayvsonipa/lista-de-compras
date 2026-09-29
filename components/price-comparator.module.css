@@ -1,0 +1,67 @@
+/* Estilos exclusivos do comparador: não alteram a lista ou o tema global. */
+.layout {
+  padding: clamp(16px, 3vw, 28px);
+}
+.layout :global(.comparator-heading) { align-items: flex-start; gap: 16px; margin-bottom: 24px; }
+.layout :global(.comparator-icon) { width: 52px; height: 52px; border-radius: 18px; transform: none; }
+.layout :global(.comparator-icon svg) { width: 26px; height: 26px; }
+.layout :global(.comparator-heading h2) { font-size: clamp(24px, 4vw, 30px); line-height: 1.15; margin: 5px 0 8px; }
+.layout :global(.comparator-heading p) { font-size: 11px; letter-spacing: .09em; line-height: 1.4; }
+.layout :global(.comparator-heading span) { font-size: 14px; line-height: 1.5; }
+.layout :global(.comparison-count) { display: flex; flex-direction: column; align-items: stretch; padding: 18px; gap: 16px; border-radius: 22px; margin-bottom: 18px; }
+.layout :global(.comparison-count > span) { font-size: 14px; line-height: 1.4; }
+.layout :global(.comparison-count > div) { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.layout :global(.comparison-count button) { min-height: 48px; border-radius: 14px; padding: 10px 12px; font-size: 14px; justify-content: center; }
+.layout :global(.product-comparison-grid) { grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); gap: 18px; }
+.layout :global(.comparison-product) { container-type: inline-size; padding: 20px 16px; border-radius: 24px; box-shadow: 0 2px 6px color-mix(in srgb, var(--foreground) 3%, transparent); }
+.layout :global(.product-number) { margin-bottom: 20px; flex-wrap: wrap; }
+.layout :global(.product-number > span) { font-size: 13px; letter-spacing: .09em; }
+.layout :global(.comparison-fields) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: 14px 12px; }
+.layout :global(.comparison-fields .comparison-field-row) { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; align-items: center; min-width: 0; margin: 0; }
+.layout :global(.comparison-field-row > span) { font-size: 12px; line-height: 1.35; font-weight: 650; color: var(--muted-foreground); }
+.layout :global(.comparison-product input),
+.layout :global(.comparison-product select) { height: 48px; min-width: 0; padding: 0 10px; font-size: 16px; border-radius: 14px; }
+.layout :global(.money-input),
+.layout :global(.volume-input) { min-width: 0; border-radius: 14px; }
+.layout :global(.money-input) { grid-template-columns: auto minmax(0, 1fr); }
+.layout :global(.money-input > span) { font-size: 13px; padding: 0 8px; }
+.layout :global(.money-input input),
+.layout :global(.volume-input input),
+.layout :global(.volume-input select) { border-radius: 0; }
+.layout :global(.volume-input select) { min-width: 54px; padding: 0 4px; font-size: 13px; }
+.layout :global(.comparison-fields .comparison-amount) { grid-template-columns: minmax(0, 1fr) 54px; min-height: 64px; gap: 8px; }
+.layout :global(.comparison-amount input) { text-align: center; padding: 0 5px; }
+.layout :global(.product-result) { min-width: 0; min-height: 64px; margin: 0; padding: 10px; border-radius: 14px; align-self: stretch; }
+.layout :global(.product-result p) { min-height: 44px; font-size: 12px; line-height: 1.35; }
+.layout :global(.product-result > div) { flex-wrap: wrap; gap: 2px 6px; }
+.layout :global(.product-result span),
+.layout :global(.product-result small) { font-size: 11px; line-height: 1.4; }
+.layout :global(.product-result strong) { font-size: 13px; overflow-wrap: anywhere; }
+.layout :global(.product-result small) { margin-top: 6px; }
+.layout :global(.comparison-product.winner) { animation: none; border-color: var(--winner); box-shadow: 0 0 0 1px var(--winner); }
+.layout :global(.comparison-product.winner .product-result) { background: color-mix(in srgb, var(--winner) 12%, var(--card)); }
+.layout :global(.reset-comparison) { min-height: 48px; }
+.layout button:focus-visible, .layout input:focus-visible, .layout select:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+.layout :global(.money-input):focus-within,
+.layout :global(.volume-input):focus-within { outline: 2px solid var(--primary); outline-offset: 2px; }
+@container (min-width: 480px) {
+  .layout :global(.comparison-fields .comparison-price),
+  .layout :global(.comparison-fields .comparison-volume) { grid-template-columns: auto minmax(0, 1fr); gap: 10px; }
+  .layout :global(.comparison-fields .comparison-amount) { grid-template-columns: minmax(0, 1fr) 76px; }
+  .layout :global(.comparison-field-row > span) { font-size: 14px; }
+}
+@media (max-width: 360px) {
+  .layout :global(.comparator-heading) { gap: 10px; }
+  .layout :global(.comparator-icon) { width: 42px; height: 42px; border-radius: 14px; }
+  .layout :global(.comparison-product) { padding-inline: 12px; }
+  .layout :global(.comparison-fields) { column-gap: 8px; }
+  .layout :global(.comparison-fields .comparison-amount) { grid-template-columns: minmax(0, 1fr); }
+  .layout :global(.comparison-amount input) { width: 64px; }
+}
+.layout :global(.comparison-help) { color: var(--muted-foreground); font-size: 12px; line-height: 1.5; margin: -4px 2px 16px; }
+.layout :global(.comparison-winner) { border-radius: 22px; padding: 20px; }
+.layout :global(.comparison-winner > span) { transform: none; }
+.layout :global(.summary-price) { color: var(--primary); font-size: 26px; font-weight: 750; margin: 8px 0; letter-spacing: -.03em; }
+.layout :global(.summary-price small) { font-size: 14px; font-weight: 500; }
+.layout :global(.product-number strong) { white-space: normal; }
+.layout :global(.product-result > div:first-child strong) { color: var(--primary); font-size: 16px; }
