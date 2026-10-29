@@ -1096,8 +1096,8 @@ button:disabled {
 
 .add-form {
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(8.5rem, 0.75fr) 9rem auto;
-  align-items: end;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
   gap: 0.7rem;
   margin: 0 1.35rem;
   border: 1px solid var(--border);
@@ -2434,7 +2434,7 @@ button:disabled {
 /* LISTA-CASA-FORMULARIO-COMPACTO:INICIO */
 @media (max-width: 720px) {
   .add-form.category-add-form {
-    grid-template-columns: minmax(0, 1fr) 128px;
+    grid-template-columns: minmax(0, 1fr);
     align-items: start;
     gap: 12px;
     margin-inline: 12px;
@@ -2452,7 +2452,7 @@ button:disabled {
     gap: 6px;
     grid-template-rows: auto 48px auto;
   }
-  .add-form.category-add-form > .category-field { grid-column: 1; }
+  .add-form.category-add-form > .category-field { grid-column: 1 / -1; }
   .add-form.category-add-form > .quantity-field { grid-column: 2; }
   .add-form.category-add-form .product-field { min-width: 0; gap: 6px; }
   .add-form.category-add-form input,
