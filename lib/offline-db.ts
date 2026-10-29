@@ -5,6 +5,10 @@ export type OfflineItem = {
   productId: string | null;
   name: string;
   quantity: string;
+  unit?: string;
+  notes?: string;
+  priceBasis?: string | null;
+  totalPrice?: number | null;
   categoryId: string | null;
   previousUnitPrice: number | null;
   unitPrice: number | null;
@@ -23,6 +27,7 @@ export type OfflineProduct = {
   name: string;
   categoryId: string | null;
   lastUnitPrice: number | null;
+  lastPriceBasis?: string | null;
   lastPurchasedAt: string | null;
   updatedAt: string;
 };
@@ -103,11 +108,12 @@ export async function getOfflineSnapshot(familyId: string) {
       if (!result) return resolve(null);
       resolve({
         ...result,
-        products: result.products ?? [],
+        products: (result.products ?? []).map(product => ({ ...product, lastUnitPrice: product.lastPriceBasis ? product.lastUnitPrice : null })),
         items: (result.items ?? []).map((item) => ({
           ...item,
           productId: item.productId ?? null,
-          previousUnitPrice: item.previousUnitPrice ?? null,
+          unit: item.unit ?? "un", notes: item.notes ?? "",
+          previousUnitPrice: item.unit ? item.previousUnitPrice ?? null : null,
         })),
       });
     };

@@ -2497,3 +2497,15 @@ button:disabled {
   }
 }
 /* LISTA-CASA-CARDS-COMPACTOS:FIM */
+/* Quantidade, unidade e observação separadas da identidade do produto. */
+.measure-fields { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px; min-width:0; grid-column:1/-1; }
+.measure-fields label { display:flex; flex-direction:column; gap:6px; min-width:0; font-size:13px; }
+.measure-fields input,.measure-fields select,.purchase-price-field select { width:100%; min-width:0; min-height:44px; padding:10px; border:1px solid var(--border); border-radius:10px; background:var(--card); color:inherit; font:inherit; }
+.measure-fields .measure-notes { grid-column:1/-1; }
+.item-description>span { white-space:normal; overflow-wrap:anywhere; flex-shrink:0; max-width:85px; }
+.item-notes { overflow-wrap:anywhere; }
+
+.replacement-choice { display:flex; align-items:center; gap:8px; font-size:13px; }
+.replacement-choice input { width:18px; height:18px; }
+
+.measure-fields select { font-size:14px; padding-left:8px; padding-right:4px; }

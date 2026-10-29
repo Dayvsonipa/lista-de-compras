@@ -1,3 +1,4 @@
+import { baseUnit, baseQuantity, parseQuantity, validUnit, needsProductChoice } from "@/lib/measures";
 import { ProductCatalogError, resolveFamilyProduct } from "@/lib/product-catalog";
 import { randomUUID } from "node:crypto";
 import { getSessionUser } from "@/lib/auth";
@@ -42,17 +43,6 @@ function parsePrice(value: unknown) {
   return price.toFixed(2);
 }
 
-function parseItemQuantity(value: unknown) {
-  if (value === undefined || value === null || value === "") return "1";
-
-  const raw = String(value).trim();
-  if (!/^\d{1,3}$/.test(raw)) return null;
-
-  const quantity = Number(raw);
-  if (!Number.isInteger(quantity) || quantity < 1 || quantity > 999) return null;
-  return String(quantity);
-}
-
 async function familyUser() {
   const user = await getSessionUser();
   if (!user) return { error: Response.json({ error: "Faça login novamente." }, { status: 401 }) };
@@ -69,7 +59,7 @@ export async function GET() {
       SELECT
         si.id,
         si.name,
-        si.quantity,
+        si.quantity, si.unit, si.notes, si.price_basis, si.total_price_override,
         si.category_id,
         si.product_id,
         si.unit_price,
@@ -77,13 +67,19 @@ export async function GET() {
         si.created_at,
         si.completed_at,
         si.updated_at,
-        CASE WHEN si.completed THEN si.comparison_unit_price ELSE fp.last_unit_price END AS previous_unit_price,
+        CASE WHEN si.completed THEN CASE WHEN si.price_basis IS NOT NULL THEN si.comparison_unit_price END ELSE previous.unit_price END AS previous_unit_price,
         added.name AS added_by_name,
         completed.name AS completed_by_name
       FROM shopping_items si
       JOIN users added ON added.id = si.added_by
       LEFT JOIN users completed ON completed.id = si.completed_by
-      LEFT JOIN family_products fp ON fp.id = si.product_id
+      LEFT JOIN LATERAL (
+        SELECT pi.unit_price FROM purchase_items pi
+        WHERE pi.product_id=si.product_id AND pi.family_id=si.family_id
+          AND pi.price_basis=CASE si.unit WHEN 'g' THEN 'kg' WHEN 'ml' THEN 'l' ELSE si.unit END
+          AND pi.unit_price IS NOT NULL
+        ORDER BY pi.purchased_at DESC,pi.id DESC LIMIT 1
+      ) previous ON TRUE
       WHERE si.family_id = ${auth.user.familyId}
       ORDER BY si.completed ASC, si.created_at DESC
       LIMIT 300
@@ -94,6 +90,8 @@ export async function GET() {
         id: String(row.id),
         name: String(row.name),
         quantity: String(row.quantity ?? ""),
+        totalPrice: row.total_price_override === null ? null : Number(row.total_price_override),
+        unit: String(row.unit), notes: String(row.notes), priceBasis: row.price_basis ? String(row.price_basis) : null,
         categoryId: row.category_id ? String(row.category_id) : null,
         productId: row.product_id ? String(row.product_id) : null,
         previousUnitPrice: row.previous_unit_price === null ? null : Number(row.previous_unit_price),
@@ -120,12 +118,14 @@ export async function POST(request: Request) {
     if ("error" in auth) return auth.error;
 
     stage = "ler e validar dados";
-    const body = (await request.json()) as { id?: string; productId?: string; globalProductId?: string | null; name?: string; quantity?: string; categoryId?: string | null };
+    const body = (await request.json()) as { id?: string; productId?: string; globalProductId?: string | null; name?: string; quantity?: string; unit?: string; notes?: string; measurementVersion?: number; replaceProduct?: boolean; measuredQuantity?: string; priceMode?: string; categoryId?: string | null };
     const name = cleanText(body.name, 120);
-    const quantity = parseItemQuantity(body.quantity);
+    const unit = body.unit ?? (body.measurementVersion === 2 ? "item" : "un");
+    const quantity = validUnit(unit) ? parseQuantity(body.quantity, unit) : null;
+    const notes = cleanText(body.notes, 240);
     const categoryId = typeof body.categoryId === "string" && UUID_PATTERN.test(body.categoryId) ? body.categoryId : null;
     if (!name) return Response.json({ error: "Informe o produto." }, { status: 400 });
-    if (!quantity) return Response.json({ error: "Informe uma quantidade entre 1 e 999." }, { status: 400 });
+    if (!quantity) return Response.json({ error: "Informe uma quantidade válida (até 9999; peso/volume aceitam 3 casas decimais)." }, { status: 400 });
 
     const id = typeof body.id === "string" && UUID_PATTERN.test(body.id) ? body.id : randomUUID();
     const requestedProductId = typeof body.productId === "string" && UUID_PATTERN.test(body.productId) ? body.productId : randomUUID();
@@ -148,8 +148,8 @@ export async function POST(request: Request) {
 
     stage = "inserir item em shopping_items";
     await sql`
-      INSERT INTO shopping_items (id, family_id, category_id, product_id, name, quantity, added_by)
-      VALUES (${id}, ${auth.user.familyId}, ${categoryId}, ${productId}, ${name}, ${quantity}, ${auth.user.id})
+      INSERT INTO shopping_items (id, family_id, category_id, product_id, name, quantity, added_by, unit, notes, measurement_version)
+      VALUES (${id}, ${auth.user.familyId}, ${categoryId}, ${productId}, ${name}, ${quantity}, ${auth.user.id}, ${unit}, ${notes}, ${body.measurementVersion === 2 ? 2 : 1})
       ON CONFLICT (id) DO NOTHING
     `;
 
@@ -166,20 +166,22 @@ export async function PATCH(request: Request) {
     const auth = await familyUser();
     if ("error" in auth) return auth.error;
 
-    const body = (await request.json()) as { id?: string; productId?: string; globalProductId?: string | null; name?: string; quantity?: string; categoryId?: string | null; completed?: boolean; unitPrice?: string | number | null };
+    const body = (await request.json()) as { id?: string; productId?: string; globalProductId?: string | null; name?: string; quantity?: string; unit?: string; notes?: string; measurementVersion?: number; replaceProduct?: boolean; measuredQuantity?: string; priceMode?: string; categoryId?: string | null; completed?: boolean; unitPrice?: string | number | null };
     if (typeof body.id !== "string" || !UUID_PATTERN.test(body.id)) {
       return Response.json({ error: "Alteração inválida." }, { status: 400 });
     }
 
     const sql = db();
 
-    if (body.name !== undefined || body.quantity !== undefined || body.categoryId !== undefined) {
+    if (body.name !== undefined || body.quantity !== undefined || body.categoryId !== undefined || body.unit !== undefined || body.notes !== undefined) {
       const name = cleanText(body.name, 120);
-      const quantity = parseItemQuantity(body.quantity);
+      const unit = body.unit ?? (body.measurementVersion === 2 ? "item" : "un");
+      const quantity = validUnit(unit) ? parseQuantity(body.quantity, unit) : null;
+      const notes = cleanText(body.notes, 240);
       const categoryId = typeof body.categoryId === "string" && UUID_PATTERN.test(body.categoryId) ? body.categoryId : null;
       const requestedProductId = typeof body.productId === "string" && UUID_PATTERN.test(body.productId) ? body.productId : randomUUID();
       if (!name) return Response.json({ error: "Informe o produto." }, { status: 400 });
-      if (!quantity) return Response.json({ error: "Informe uma quantidade entre 1 e 999." }, { status: 400 });
+      if (!quantity) return Response.json({ error: "Informe uma quantidade válida (até 9999; peso/volume aceitam 3 casas decimais)." }, { status: 400 });
 
       if (categoryId) {
         const categoryRows = await sql`
@@ -191,18 +193,19 @@ export async function PATCH(request: Request) {
       }
 
       // Resolve only after checking the item belongs to this family and is editable.
-      const existing = await sql`SELECT product_id FROM shopping_items
+      const existing = await sql`SELECT product_id, unit, notes, measurement_version FROM shopping_items
         WHERE id = ${body.id} AND family_id = ${auth.user.familyId} AND completed = FALSE`;
+      if (existing.length && body.measurementVersion !== 2 && (existing[0].measurement_version === 2 || existing[0].unit !== "un" || existing[0].notes)) return Response.json({ error: "Atualize o aplicativo antes de alterar este item com medidas." }, { status: 409 });
       if (!existing.length) return Response.json({ error: "Produto não encontrado ou já comprado." }, { status: 404 });
       const productId = await resolveFamilyProduct({
         familyId: auth.user.familyId!,
-        requestedId: existing[0].product_id ? String(existing[0].product_id) : requestedProductId,
-        name, categoryId, rename: true,
+        requestedId: body.replaceProduct ? requestedProductId : String(existing[0].product_id ?? requestedProductId),
+        name, categoryId, rename: !body.replaceProduct,
       });
 
       const rows = await sql`
         UPDATE shopping_items
-        SET name = ${name}, quantity = ${quantity}, category_id = ${categoryId}, product_id = ${productId}, updated_at = NOW()
+        SET name = ${name}, quantity = ${quantity}, unit = ${unit}, notes = ${notes}, measurement_version = ${body.measurementVersion === 2 ? 2 : 1}, category_id = ${categoryId}, product_id = ${productId}, updated_at = NOW()
         WHERE id = ${body.id}
           AND family_id = ${auth.user.familyId}
           AND completed = FALSE
@@ -217,28 +220,33 @@ export async function PATCH(request: Request) {
       return Response.json({ error: "Alteração inválida." }, { status: 400 });
     }
 
-    const unitPrice = body.completed && auth.user.collectPricesOnPurchase
-      ? parsePrice(body.unitPrice)
-      : null;
-    if (Number.isNaN(unitPrice)) {
-      return Response.json({ error: "Informe um preço válido, com no máximo duas casas decimais." }, { status: 400 });
-    }
-
+    const current = await sql`SELECT quantity,unit,notes,name,measurement_version FROM shopping_items WHERE id=${body.id} AND family_id=${auth.user.familyId}`;
+    if (!current.length) return Response.json({ error: "Produto não encontrado." }, { status: 404 });
+    const row = current[0];
+    if (body.measurementVersion !== 2 && (row.measurement_version === 2 || row.unit !== "un" || row.notes)) return Response.json({ error: "Atualize o aplicativo antes de alterar este item com medidas." }, { status: 409 });
+    if (body.completed && needsProductChoice(String(row.name))) return Response.json({ error: "Edite o item e escolha o produto comprado antes de colocar no carrinho." }, { status: 400 });
+    const quantity = parseQuantity(body.measuredQuantity ?? row.quantity, String(row.unit));
+    if (!quantity) return Response.json({ error: "Quantidade inválida." }, { status: 400 });
+    if (body.priceMode && !["unit", "total"].includes(body.priceMode)) return Response.json({ error: "Forma de preço inválida." }, { status: 400 });
+    const entered = body.completed && auth.user.collectPricesOnPurchase ? parsePrice(body.unitPrice) : null;
+    if (Number.isNaN(entered)) return Response.json({ error: "Informe um preço válido." }, { status: 400 });
+    const basis = body.measurementVersion === 2 && row.unit !== "item" ? baseUnit(String(row.unit)) : null;
+    const amount = baseQuantity(quantity, String(row.unit));
+    const unitPrice = entered === null ? null : body.priceMode === "total" ? Number(entered) / amount : Number(entered);
+    if (unitPrice !== null && (!Number.isFinite(unitPrice) || unitPrice > 9999999.99)) return Response.json({ error: "Preço por unidade acima do limite." }, { status: 400 });
     const rows = await sql`
-      UPDATE shopping_items
-      SET
-        comparison_unit_price = CASE WHEN ${body.completed} THEN
+      UPDATE shopping_items SET
+        comparison_unit_price = CASE WHEN ${body.completed} AND ${basis}::text IS NOT NULL THEN
           CASE WHEN completed THEN comparison_unit_price ELSE
-            (SELECT fp.last_unit_price FROM family_products fp WHERE fp.id = shopping_items.product_id AND fp.family_id = ${auth.user.familyId}) END
-          ELSE NULL END,
-        completed = ${body.completed},
-        completed_by = CASE WHEN ${body.completed} THEN ${auth.user.id}::uuid ELSE NULL END,
-        completed_at = CASE WHEN ${body.completed} THEN NOW() ELSE NULL END,
-        unit_price = CASE WHEN ${body.completed} THEN ${unitPrice}::numeric ELSE NULL END
-        , updated_at = NOW()
-      WHERE id = ${body.id}
-        AND family_id = ${auth.user.familyId}
-      RETURNING id
+            (SELECT pi.unit_price FROM purchase_items pi WHERE pi.product_id=shopping_items.product_id
+              AND pi.family_id=${auth.user.familyId} AND pi.price_basis=${basis} AND pi.unit_price IS NOT NULL
+              ORDER BY pi.purchased_at DESC,pi.id DESC LIMIT 1) END ELSE NULL END,
+        quantity=${quantity}, price_basis=CASE WHEN ${body.completed} THEN ${basis} ELSE NULL END,
+        completed=${body.completed},
+        completed_by=CASE WHEN ${body.completed} THEN ${auth.user.id}::uuid ELSE NULL END,
+        completed_at=CASE WHEN ${body.completed} THEN COALESCE(completed_at,NOW()) ELSE NULL END,
+        unit_price=${unitPrice}, total_price_override=${body.completed && body.priceMode === "total" ? entered : null}, updated_at=NOW()
+      WHERE id=${body.id} AND family_id=${auth.user.familyId} RETURNING id
     `;
 
     if (rows.length === 0) return Response.json({ error: "Produto não encontrado." }, { status: 404 });
