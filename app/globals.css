@@ -2509,3 +2509,52 @@ button:disabled {
 .replacement-choice input { width:18px; height:18px; }
 
 .measure-fields select { font-size:14px; padding-left:8px; padding-right:4px; }
+
+/* Categoria, quantidade e unidade na mesma linha apenas no formulário móvel. */
+@media (max-width: 720px) {
+  .add-form.category-add-form {
+    grid-template-columns: minmax(0, 46fr) minmax(74px, 20fr) minmax(0, 34fr);
+    column-gap: 8px;
+  }
+  .add-form.category-add-form > .measure-fields { display: contents; }
+  .add-form.category-add-form > .category-field {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .add-form.category-add-form > .measure-fields > label:nth-child(1) {
+    grid-column: 2;
+    grid-row: 2;
+  }
+  .add-form.category-add-form > .measure-fields > label:nth-child(2) {
+    grid-column: 3;
+    grid-row: 2;
+  }
+  .add-form.category-add-form > .category-field,
+  .add-form.category-add-form > .measure-fields > label:not(.measure-notes) {
+    display: grid;
+    grid-template-rows: 30px 48px;
+    gap: 6px;
+    min-width: 0;
+    font-size: 11px;
+    line-height: 15px;
+    color: var(--muted-foreground);
+    font-weight: 700;
+  }
+  .add-form.category-add-form > .category-field > span {
+    font-size: 11px;
+    line-height: 15px;
+  }
+  .add-form.category-add-form > .category-field > .field-hint { display: none; }
+  .add-form.category-add-form > .measure-fields > label:not(.measure-notes) > input,
+  .add-form.category-add-form > .measure-fields > label:not(.measure-notes) > select {
+    height: 48px;
+    padding-inline: 6px;
+    font-size: 16px;
+    font-weight: 400;
+    color: var(--foreground);
+  }
+  .add-form.category-add-form > .measure-fields > .measure-notes {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+}
