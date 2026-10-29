@@ -4,9 +4,10 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import { useRouter } from "next/navigation";
 import {
   Calculator, Check, CircleCheckBig, Clipboard, Cloud, CloudOff, ListChecks,
-  LoaderCircle, LogOut, Minus, Moon, Pencil, Plus, RefreshCw, Settings,
+  LoaderCircle, LogOut, Moon, Pencil, Plus, RefreshCw, Settings,
   ShoppingBasket, Sun, Tags, Trash2, Users, X,
 } from "lucide-react";
+import { units, baseUnit, baseQuantity, parseQuantity, measuredTotal, quantityLabel, needsProductChoice } from "@/lib/measures";
 import itemStyles from "./shopping-item.module.css";
 import { PriceComparator } from "./price-comparator";
 import { useAppLanguage } from "./language";
@@ -37,23 +38,20 @@ function firstName(value: string) {
   return value.trim().split(/\s+/)[0] || value;
 }
 
-function quantityMultiplier(value: string) {
-  const match = value.trim().match(/^(\d+)(?:\s*(?:un\.?|unidades?|pacotes?|pcts?\.?|caixas?|garrafas?|fardos?))?$/i);
-  if (!match) return 1;
-  const quantity = Number(match[1]);
-  return Number.isInteger(quantity) && quantity > 0 ? quantity : 1;
-}
-
-function normalizeQuantity(value: string) {
-  const quantity = Number(value);
-  if (!/^\d+$/.test(value) || !Number.isInteger(quantity) || quantity < 1) return "1";
-  return String(Math.min(quantity, 999));
-}
-
-function quantityDisplay(value: string) {
-  const raw = value.trim();
-  if (/^\d+$/.test(raw)) return `${normalizeQuantity(raw)} ×`;
-  return raw || "1 ×";
+function quantityMultiplier(value: string) { return Number(value.replace(",", ".")) || 1; }
+function normalizeQuantity(value: string) { return value.replace(",", "."); }
+function MeasureFields({ language, quantity, unit, notes, onQuantity, onUnit, onNotes }: {
+  language: AppLanguage; quantity: string; unit: string; notes: string;
+  onQuantity: (v: string) => void; onUnit: (v: string) => void; onNotes: (v: string) => void;
+}) {
+  const t = (key: Parameters<typeof translate>[1]) => translate(language, key);
+  return <div className="measure-fields">
+    <label>{t("quantity")}<input aria-label={t("quantity")} value={quantity} inputMode="decimal" required
+      onChange={e => onQuantity(e.target.value.replace(/[^\d,.]/g, "").slice(0, 8))} /></label>
+    <label>{t("measurementUnit")}<select aria-label={t("measurementUnit")} value={unit} onChange={e => onUnit(e.target.value)}>{units.map(u => <option key={u} value={u}>{u === "item" ? t("measureNotProvided") : u}</option>)}</select></label>
+    <label className="measure-notes">{t("notesOptional")}<input aria-label={t("notesOptional")} value={notes} maxLength={240}
+      placeholder={t("notesExample")} onChange={e => onNotes(e.target.value)} /></label>
+  </div>;
 }
 
 function parseMoneyInput(value: string) {
@@ -66,7 +64,8 @@ function parseMoneyInput(value: string) {
 
 function itemTotal(item: Item) {
   if (item.unitPrice === null) return null;
-  return Math.round((item.unitPrice * quantityMultiplier(item.quantity) + Number.EPSILON) * 100) / 100;
+  if (item.totalPrice != null) return item.totalPrice;
+  return measuredTotal(item.unitPrice, item.quantity, item.unit, item.priceBasis);
 }
 
 function nowIso() {
@@ -89,6 +88,8 @@ export function ShoppingApp({ userName, familyId, familyName, inviteCode, initia
   const [products, setProducts] = useState<Product[]>([]);
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("1");
+  const [unit, setUnit] = useState("item");
+  const [notes, setNotes] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [generalSuggestions, setGeneralSuggestions] = useState<Product[]>([]);
@@ -112,15 +113,21 @@ export function ShoppingApp({ userName, familyId, familyName, inviteCode, initia
   const [languageSaving, setLanguageSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [failedMutation, setFailedMutation] = useState<PendingMutation | null>(null);
   const [dark, setDark] = useState(false);
   const [copied, setCopied] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [collectPricesOnPurchase, setCollectPricesOnPurchase] = useState(initialCollectPricesOnPurchase);
   const [purchaseItem, setPurchaseItem] = useState<Item | null>(null);
   const [purchasePrice, setPurchasePrice] = useState("");
+  const [purchaseQuantity, setPurchaseQuantity] = useState("1");
+  const [priceMode, setPriceMode] = useState("unit");
   const [editItem, setEditItem] = useState<Item | null>(null);
   const [editName, setEditName] = useState("");
   const [editQuantity, setEditQuantity] = useState("1");
+  const [editUnit, setEditUnit] = useState("un");
+  const [editNotes, setEditNotes] = useState("");
+  const [editReplacement, setEditReplacement] = useState(false);
   const [editCategoryId, setEditCategoryId] = useState("");
   const [editSaving, setEditSaving] = useState(false);
   const [clearOpen, setClearOpen] = useState(false);
@@ -178,8 +185,9 @@ export function ShoppingApp({ userName, familyId, familyName, inviteCode, initia
           continue;
         }
         if (response.status < 500) {
-          await removePendingMutation(mutation.mutationId);
-          continue;
+          setFailedMutation(mutation);
+          const problem = await response.json().catch(() => ({}));
+          throw new PermanentRequestError(problem.error || "Não foi possível sincronizar uma alteração. Ela foi preservada neste aparelho.");
         }
         throw new Error(t("temporaryServer"));
       }
@@ -201,13 +209,14 @@ export function ShoppingApp({ userName, familyId, familyName, inviteCode, initia
       replaceLocalData(itemsData.items ?? [], categoriesData.categories ?? [], productsData.products ?? [], syncedAt);
       if (typeof itemsData.collectPricesOnPurchase === "boolean") setCollectPricesOnPurchase(itemsData.collectPricesOnPurchase);
       setPendingChanges(0);
+      setFailedMutation(null);
       setOnline(true);
       setError("");
-      const registration = await navigator.serviceWorker?.ready;
+      const registration = await navigator.serviceWorker?.getRegistration();
       registration?.active?.postMessage({ type: "CACHE_APP_SHELL" });
     } catch (syncError) {
-      setOnline(false);
-      if (itemsRef.current.length === 0) setError(syncError instanceof Error ? syncError.message : t("loadListError"));
+      setOnline(syncError instanceof PermanentRequestError && navigator.onLine);
+      if (syncError instanceof PermanentRequestError || itemsRef.current.length === 0) setError(syncError instanceof Error ? syncError.message : t("loadListError"));
     } finally {
       syncingRef.current = false;
       setSyncing(false);
@@ -328,6 +337,7 @@ export function ShoppingApp({ userName, familyId, familyName, inviteCode, initia
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!name.trim()) return;
+    if (!parseQuantity(quantity, unit)) { setError("Quantidade inválida para esta unidade."); return; }
     setSaving(true);
     const timestamp = nowIso();
     const previousItems = itemsRef.current;
@@ -346,7 +356,8 @@ export function ShoppingApp({ userName, familyId, familyName, inviteCode, initia
     }, ...previousProducts];
     const item: Item = {
       id: crypto.randomUUID(), productId, name: name.trim(), quantity: normalizeQuantity(quantity), categoryId: categoryId || existingProduct?.categoryId || null,
-      previousUnitPrice: existingProduct?.lastUnitPrice ?? null,
+      unit, notes: notes.trim(), priceBasis: null,
+      previousUnitPrice: existingProduct?.lastPriceBasis === baseUnit(unit) ? existingProduct.lastUnitPrice : null,
       unitPrice: null, completed: false, addedBy: userName, completedBy: null, createdAt: timestamp,
       completedAt: null, updatedAt: timestamp,
     };
@@ -354,25 +365,26 @@ export function ShoppingApp({ userName, familyId, familyName, inviteCode, initia
     setName("");
     setSelectedGlobalId(null);
     setGeneralSuggestions([]);
-    setQuantity("1");
+    setQuantity("1"); setNotes(""); setUnit("item");
     try {
-      await performMutation("/api/items", "POST", { id: item.id, productId: item.productId, globalProductId: selectedGlobalId, name: item.name, quantity: item.quantity, categoryId: item.categoryId });
+      await performMutation("/api/items", "POST", { id: item.id, productId: item.productId, globalProductId: selectedGlobalId, name: item.name, quantity: item.quantity, categoryId: item.categoryId, unit: item.unit, notes: item.notes, measurementVersion: 2 });
     } catch (submitError) {
       commitItemsAndProducts(previousItems, previousProducts);
       setError(submitError instanceof Error ? submitError.message : t("addError"));
     } finally { setSaving(false); }
   }
 
-  async function changeCompleted(item: Item, completedState: boolean, unitPrice: string | null = null) {
+  async function changeCompleted(item: Item, completedState: boolean, unitPrice: string | null = null, measuredQuantity = item.quantity, mode = "unit") {
     setBusyId(item.id);
-    const parsedPrice = completedState && unitPrice ? parseMoneyInput(unitPrice) : null;
+    const enteredPrice = completedState && unitPrice ? parseMoneyInput(unitPrice) : null;
+    const parsedPrice = enteredPrice === null ? null : mode === "total" ? Number((enteredPrice / baseQuantity(measuredQuantity, item.unit)).toFixed(6)) : enteredPrice;
     const timestamp = nowIso();
     commitItems(itemsRef.current.map((entry) => entry.id === item.id ? {
-      ...entry, completed: completedState, unitPrice: parsedPrice, completedBy: completedState ? userName : null,
+      ...entry, totalPrice: mode === "total" ? enteredPrice : null, quantity: measuredQuantity, priceBasis: completedState && item.unit !== "item" ? baseUnit(item.unit) : null, completed: completedState, unitPrice: parsedPrice, completedBy: completedState ? userName : null,
       completedAt: completedState ? timestamp : null, updatedAt: timestamp,
     } : entry));
     try {
-      await performMutation("/api/items", "PATCH", { id: item.id, completed: completedState, unitPrice });
+      await performMutation("/api/items", "PATCH", { id: item.id, completed: completedState, unitPrice, measuredQuantity, priceMode: mode, measurementVersion: 2 });
     } catch (toggleError) {
       setError(toggleError instanceof Error ? toggleError.message : t("updateError"));
       void syncNow();
@@ -380,21 +392,23 @@ export function ShoppingApp({ userName, familyId, familyName, inviteCode, initia
   }
 
   async function toggleItem(item: Item) {
-    if (!item.completed && collectPricesOnPurchase) { setPurchasePrice(""); setPurchaseItem(item); return; }
+    if (!item.completed && needsProductChoice(item.name)) { setError("Edite o item e escolha o produto comprado (por exemplo, aveia ou granola)."); openEdit(item); return; }
+    if (!item.completed && collectPricesOnPurchase) { setPurchasePrice(""); setPurchaseQuantity(item.quantity); setPriceMode(item.unit === "item" ? "total" : "unit"); setPurchaseItem(item); return; }
     await changeCompleted(item, !item.completed);
   }
 
   async function finishPurchase(unitPrice: string | null) {
     if (!purchaseItem) return;
     const item = purchaseItem;
+    if (!parseQuantity(purchaseQuantity, item.unit)) { setError("Informe a quantidade realmente comprada."); return; }
     setPurchaseItem(null);
     setPurchasePrice("");
-    await changeCompleted(item, true, unitPrice);
+    await changeCompleted(item, true, unitPrice, normalizeQuantity(purchaseQuantity), priceMode);
   }
 
   function openEdit(item: Item) {
     setEditItem(item);
-    setEditName(item.name);
+    setEditName(item.name); setEditReplacement(needsProductChoice(item.name)); setEditUnit(item.unit ?? "un"); setEditNotes(item.notes ?? "");
     setEditQuantity(String(quantityMultiplier(item.quantity)));
     setEditCategoryId(item.categoryId ?? "");
   }
@@ -404,12 +418,13 @@ export function ShoppingApp({ userName, familyId, familyName, inviteCode, initia
     if (!editItem || !editName.trim()) return;
     const item = editItem;
     const nextName = editName.trim();
-    const nextQuantity = normalizeQuantity(editQuantity);
+    const nextQuantity = parseQuantity(editQuantity, editUnit);
+    if (!nextQuantity) { setError("Quantidade inválida para esta unidade."); return; }
     const nextCategoryId = editCategoryId || null;
     const previousItems = itemsRef.current;
     const previousProducts = productsRef.current;
-    const existingProduct = previousProducts.find((product) => product.id === item.productId);
-    const nextProductId = item.productId ?? crypto.randomUUID();
+    const existingProduct = previousProducts.find((product) => editReplacement ? normalizeProductName(product.name) === normalizeProductName(nextName) : product.id === item.productId);
+    const nextProductId = existingProduct?.id ?? crypto.randomUUID();
     const nextProducts = existingProduct ? previousProducts.map((product) => product.id === existingProduct.id ? { ...product, name: nextName, categoryId: nextCategoryId || product.categoryId, updatedAt: nowIso() } : product) : [{
       id: nextProductId,
       name: nextName,
@@ -423,14 +438,14 @@ export function ShoppingApp({ userName, familyId, familyName, inviteCode, initia
       ...entry,
       productId: nextProductId,
       name: nextName,
-      quantity: nextQuantity,
+      quantity: nextQuantity, unit: editUnit, notes: editNotes.trim(),
       categoryId: nextCategoryId,
-      previousUnitPrice: existingProduct?.lastUnitPrice ?? item.previousUnitPrice,
+      previousUnitPrice: existingProduct?.lastPriceBasis === baseUnit(editUnit) ? existingProduct.lastUnitPrice : null,
       updatedAt: nowIso(),
     } : entry), nextProducts);
     setEditItem(null);
     try {
-      await performMutation("/api/items", "PATCH", { id: item.id, productId: nextProductId, name: nextName, quantity: nextQuantity, categoryId: nextCategoryId });
+      await performMutation("/api/items", "PATCH", { id: item.id, productId: nextProductId, name: nextName, quantity: nextQuantity, categoryId: nextCategoryId, unit: editUnit, notes: editNotes.trim(), measurementVersion: 2, replaceProduct: editReplacement });
     } catch (editError) {
       commitItemsAndProducts(previousItems, previousProducts);
       setError(editError instanceof Error ? editError.message : t("editProductError"));
@@ -452,21 +467,21 @@ export function ShoppingApp({ userName, familyId, familyName, inviteCode, initia
     const previousItems = itemsRef.current;
     const previousProducts = productsRef.current;
     const purchaseDate = nowIso();
-    const updatedPrices = new Map<string, { unitPrice: number; purchasedAt: string }>();
+    const updatedPrices = new Map<string, { unitPrice: number; purchasedAt: string; basis: string | null }>();
     [...completed]
       .sort((a, b) => String(a.completedAt).localeCompare(String(b.completedAt)))
       .forEach((item) => {
-        if (item.productId && item.unitPrice !== null) updatedPrices.set(item.productId, { unitPrice: item.unitPrice, purchasedAt: item.completedAt ?? purchaseDate });
+        if (item.productId && item.unitPrice !== null) updatedPrices.set(item.productId, { unitPrice: item.unitPrice, purchasedAt: item.completedAt ?? purchaseDate, basis: item.priceBasis ?? null });
       });
     const nextProducts = previousProducts.map((product) => {
       const price = updatedPrices.get(product.id);
-      return price ? { ...product, lastUnitPrice: price.unitPrice, lastPurchasedAt: price.purchasedAt, updatedAt: purchaseDate } : product;
+      return price ? { ...product, lastUnitPrice: price.basis ? price.unitPrice : null, lastPriceBasis: price.basis, lastPurchasedAt: price.purchasedAt, updatedAt: purchaseDate } : product;
     });
     const nextItems = previousItems
       .filter((item) => !item.completed)
       .map((item) => {
         const price = item.productId ? updatedPrices.get(item.productId) : undefined;
-        return price ? { ...item, previousUnitPrice: price.unitPrice } : item;
+        return price ? { ...item, previousUnitPrice: price.basis === baseUnit(item.unit) ? price.unitPrice : null } : item;
       });
     commitItemsAndProducts(nextItems, nextProducts);
     setClearOpen(false);
@@ -563,7 +578,7 @@ export function ShoppingApp({ userName, familyId, familyName, inviteCode, initia
 
   async function logout() {
     await clearOfflineData().catch(() => undefined);
-    const registration = await navigator.serviceWorker?.ready;
+    const registration = await navigator.serviceWorker?.getRegistration();
     registration?.active?.postMessage({ type: "CLEAR_PRIVATE_CACHE" });
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/entrar");
@@ -645,10 +660,11 @@ export function ShoppingApp({ userName, familyId, familyName, inviteCode, initia
             <form className="purchase-modal" role="dialog" aria-modal="true" aria-labelledby="purchase-title" onMouseDown={(event) => event.stopPropagation()} onSubmit={(event) => { event.preventDefault(); if (parsedPurchasePrice !== null) void finishPurchase(purchasePrice); }}>
               <button className="icon-button invite-close" type="button" onClick={() => setPurchaseItem(null)} aria-label={t("cancelPurchase")}><X /></button>
               <p>{t("addPriceTitle")}</p><h2 id="purchase-title">{purchaseItem.name}</h2>
-              <span className="purchase-quantity">{t("quantity")}: <strong>{quantityMultiplier(purchaseItem.quantity) === 1 ? t("oneItem") : t("manyItems", { count: quantityMultiplier(purchaseItem.quantity) })}</strong></span>
-              <label className="purchase-price-field"><span>{t("unitPriceLabel")}</span><input value={purchasePrice} onChange={(event) => setPurchasePrice(event.target.value.replace(/[^\d,.]/g, "").slice(0, 15))} placeholder="R$ 0,00" inputMode="decimal" autoComplete="off" autoFocus /></label>
-              {parsedPurchasePrice !== null && <div className="purchase-calculation"><span>{t("calculatedTotal")}</span><strong>{currency(parsedPurchasePrice * quantityMultiplier(purchaseItem.quantity))}</strong></div>}
-              <button className="primary-button" type="submit" disabled={parsedPurchasePrice === null || busyId === purchaseItem.id}>{busyId === purchaseItem.id ? <LoaderCircle className="spin" /> : <Check />}{t("addToCart")}</button>
+              <label className="purchase-price-field">{t("actualQuantity", { unit: purchaseItem.unit === "item" ? "itens" : purchaseItem.unit ?? "un" })}<input aria-label="Quantidade comprada" inputMode="decimal" value={purchaseQuantity} onChange={e => setPurchaseQuantity(e.target.value.replace(/[^\d,.]/g, "").slice(0,8))} /></label>
+              <label className="purchase-price-field">{t("priceEntry")}<select aria-label="Forma do preço" value={priceMode} onChange={e => setPriceMode(e.target.value)}><option value="unit">{t("pricePer", { unit: purchaseItem.unit === "item" ? "item" : baseUnit(purchaseItem.unit) })}</option><option value="total">{t("totalPaid")}</option></select></label>
+              <label className="purchase-price-field"><span>{priceMode === "total" ? t("totalPaid") : t("pricePer", { unit: purchaseItem.unit === "item" ? "item" : baseUnit(purchaseItem.unit) })}</span><input value={purchasePrice} onChange={(event) => setPurchasePrice(event.target.value.replace(/[^\d,.]/g, "").slice(0, 15))} placeholder="R$ 0,00" inputMode="decimal" autoComplete="off" autoFocus /></label>
+              {parsedPurchasePrice !== null && <div className="purchase-calculation"><span>{t("calculatedTotal")}</span><strong>{currency(priceMode === "total" ? parsedPurchasePrice : parsedPurchasePrice * baseQuantity(purchaseQuantity, purchaseItem.unit))}</strong></div>}
+              <button className="primary-button" type="submit" disabled={parsedPurchasePrice === null || !parseQuantity(purchaseQuantity, purchaseItem.unit) || busyId === purchaseItem.id}>{busyId === purchaseItem.id ? <LoaderCircle className="spin" /> : <Check />}{t("addToCart")}</button>
               <button className="secondary-button" type="button" onClick={() => void finishPurchase(null)} disabled={busyId === purchaseItem.id}>{t("markWithoutPrice")}</button>
             </form>
           </div>}
@@ -659,22 +675,24 @@ export function ShoppingApp({ userName, familyId, familyName, inviteCode, initia
               <p>{t("editIdentityHint")}</p><h2 id="edit-item-title">{t("editProduct")}</h2>
               <label className="edit-product-field"><span>{t("productAndSize")}</span><input value={editName} onChange={(event) => setEditName(event.target.value)} maxLength={120} autoComplete="off" autoFocus required /></label>
               <label className="edit-product-field"><span>{t("category")}</span><select value={editCategoryId} onChange={(event) => setEditCategoryId(event.target.value)}><option value="">{t("noCategory")}</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
-              <div className="edit-quantity-field"><span>{t("quantity")}</span><div className="quantity-stepper"><button type="button" onClick={() => setEditQuantity((current) => String(Math.max(1, Number(normalizeQuantity(current)) - 1)))} aria-label={t("decreaseQuantity")}><Minus /></button><input value={editQuantity} onChange={(event) => setEditQuantity(event.target.value.replace(/\D/g, "").slice(0, 3))} onBlur={() => setEditQuantity((current) => normalizeQuantity(current))} type="text" inputMode="numeric" aria-label={t("packageQuantity")} /><button type="button" onClick={() => setEditQuantity((current) => String(Math.min(999, Number(normalizeQuantity(current)) + 1)))} aria-label={t("increaseQuantity")}><Plus /></button></div><small>{t("packagesOrUnits")}</small></div>
+              <label className="replacement-choice"><input type="checkbox" checked={editReplacement} onChange={e => setEditReplacement(e.target.checked)} />{t("replaceProductChoice")}</label>
+              <MeasureFields language={language} quantity={editQuantity} unit={editUnit} notes={editNotes} onQuantity={setEditQuantity} onUnit={setEditUnit} onNotes={setEditNotes} />
               <button className="primary-button" type="submit" disabled={editSaving || !editName.trim()}>{editSaving ? <LoaderCircle className="spin" /> : <Check />}{t("saveChanges")}</button>
             </form>
           </div>}
 
           <form className="add-form category-add-form" onSubmit={(event) => void submit(event)}>
             <label className="product-field product-autocomplete"><span>{t("whatIsMissing")}</span><input value={name} onFocus={() => setSuggestionsOpen(true)} onBlur={() => window.setTimeout(() => setSuggestionsOpen(false), 120)} onChange={(event) => { const nextName = event.target.value; setName(nextName); setSelectedGlobalId(null); const match = productsRef.current.find((product) => normalizeProductName(product.name) === normalizeProductName(nextName)); if (match?.categoryId) setCategoryId(match.categoryId); setSuggestionsOpen(true); }} placeholder={t("productExample")} maxLength={120} autoComplete="off" required />
-              {suggestionsOpen && productSuggestions.length > 0 && <div className="product-suggestions" role="listbox" aria-label={t("purchasedProducts")}>{productSuggestions.map((product) => <button key={product.id} type="button" role="option" aria-selected={normalizeProductName(product.name) === normalizeProductName(name)} onMouseDown={(event) => { event.preventDefault(); setName(product.name); setSelectedGlobalId(product.source === "global" ? product.id : null); if (product.categoryId) setCategoryId(product.categoryId); setSuggestionsOpen(false); }}><span>{product.name}</span><small>{product.source === "global" ? t("generalCatalog") : product.lastUnitPrice === null ? t("noPreviousPrice") : t("lastPrice", { price: currency(product.lastUnitPrice) })}</small></button>)}</div>}
+              {suggestionsOpen && productSuggestions.length > 0 && <div className="product-suggestions" role="listbox" aria-label={t("purchasedProducts")}>{productSuggestions.map((product) => <button key={product.id} type="button" role="option" aria-selected={normalizeProductName(product.name) === normalizeProductName(name)} onMouseDown={(event) => { event.preventDefault(); setName(product.name); setSelectedGlobalId(product.source === "global" ? product.id : null); if (product.categoryId) setCategoryId(product.categoryId); setSuggestionsOpen(false); }}><span>{product.name}</span><small>{product.source === "global" ? t("generalCatalog") : product.lastUnitPrice === null ? t("noPreviousPrice") : `${t("lastPrice", { price: currency(product.lastUnitPrice) })}/${product.lastPriceBasis ?? "?"}`}</small></button>)}</div>}
               <small className="field-hint">{t("includeSize")}</small>
             </label>
             <label className="category-field"><span>{t("category")}</span><select value={categoryId} onChange={(event) => setCategoryId(event.target.value)}><option value="">{t("noCategory")}</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select><small className="field-hint">{t("marketSection")}</small></label>
-            <div className="quantity-field"><span>{t("quantity")}</span><div className="quantity-stepper"><button type="button" onClick={() => setQuantity((current) => String(Math.max(1, Number(normalizeQuantity(current)) - 1)))} aria-label={t("decreaseQuantity")}><Minus /></button><input value={quantity} onChange={(event) => setQuantity(event.target.value.replace(/\D/g, "").slice(0, 3))} onBlur={() => setQuantity((current) => normalizeQuantity(current))} type="text" inputMode="numeric" aria-label={t("packageQuantity")} /><button type="button" onClick={() => setQuantity((current) => String(Math.min(999, Number(normalizeQuantity(current)) + 1)))} aria-label={t("increaseQuantity")}><Plus /></button></div><small className="field-hint">{t("packagesOrUnits")}</small></div>
+            <MeasureFields language={language} quantity={quantity} unit={unit} notes={notes} onQuantity={setQuantity} onUnit={setUnit} onNotes={setNotes} />
             <button className="primary-button add-button" type="submit" disabled={saving || !name.trim()}>{saving ? <LoaderCircle className="spin" /> : <Plus />}{t("add")}</button>
           </form>
 
           <div className="progress-block" aria-label={t("purchaseCompletedPercent", { percent: progress })}><div className="progress-labels"><span>{t("purchaseProgress")}</span><strong>{progress}%</strong></div><div className="progress-track"><span style={{ width: `${progress}%` }} /></div></div>
+          {failedMutation && <div className="inline-error" role="alert"><span>Uma alteração não pôde ser sincronizada e foi preservada neste aparelho.</span><button type="button" onClick={async () => { if (window.confirm("Descartar somente esta alteração pendente e recarregar os dados do servidor?")) { await removePendingMutation(failedMutation.mutationId); setFailedMutation(null); void syncNow(); } }}>Descartar esta alteração</button></div>}
           {error && <div className="inline-error" role="alert"><span>{error}</span><button type="button" onClick={() => setError("")} aria-label={t("closeNotice")}><X /></button></div>}
 
           {loading ? <div className="loading-state"><LoaderCircle className="spin" /> {t("loadingList")}</div>
@@ -703,14 +721,15 @@ function ItemRow({ item, language, busy, categoryName, showPriceStatus, onToggle
   const t = (key: Parameters<typeof translate>[1], values?: Record<string, string | number>) => translate(language, key, values);
   const currency = (value: number) => formatAppCurrency(value, language);
   const total = itemTotal(item);
-  const currentCents = item.unitPrice === null ? null : Math.round(item.unitPrice * 100);
+  const currentCents = !item.priceBasis || item.unitPrice === null ? null : Math.round(item.unitPrice * 100);
   const previousCents = item.previousUnitPrice === null ? null : Math.round(item.previousUnitPrice * 100);
   const priceDirection = currentCents === null || previousCents === null ? null : currentCents < previousCents ? "down" : currentCents > previousCents ? "up" : "same";
   const trendText = priceDirection === "down" ? t("priceDown") : priceDirection === "up" ? t("priceUp") : priceDirection === "same" ? t("priceSame") : "";
   return <li className={`item-row ${itemStyles.card} ${item.completed ? "is-completed" : ""}`}>
     <button className="check-button" type="button" onClick={() => onToggle(item)} aria-label={item.completed ? t("returnToList", { name: item.name }) : t("markPurchased", { name: item.name })} disabled={busy}>{busy ? <LoaderCircle className="spin" /> : item.completed ? <Check /> : null}</button>
-    <div className="item-copy"><div className="item-main-line"><div className="item-description"><span>{quantityDisplay(item.quantity)}</span><strong>{item.name.replace(/\//g, "/\u200b")}</strong></div>{item.completed && item.unitPrice !== null && total !== null && <div className="item-price" aria-label={`${currency(item.unitPrice)}; ${t("purchaseTotal")} ${currency(total)}${trendText ? `; ${trendText}` : ""}`}><span>{currency(item.unitPrice)} {t("each")}</span><div className="item-price-total"><strong>{currency(total)}</strong>{priceDirection && <em className={`price-trend is-${priceDirection}`} title={trendText} aria-label={trendText}>{priceDirection === "down" ? "▼" : priceDirection === "up" ? "▲" : "—"}</em>}</div></div>}</div>{!item.completed && item.previousUnitPrice !== null && <span className={itemStyles.lastPrice}>{t("lastShort", { price: currency(item.previousUnitPrice) })}</span>}
-      {(item.completed || categoryName) && <small>{categoryName && <em className="item-category">{categoryName}</em>}{item.completed && (item.completedBy ? t("purchasedBy", { name: firstName(item.completedBy) }) : t("addedBy", { name: firstName(item.addedBy) }))}{item.completed && item.unitPrice !== null && item.previousUnitPrice === null ? ` · ${t("firstPrice")}` : ""}{item.completed && item.unitPrice === null && showPriceStatus ? ` · ${t("priceNotInformed")}` : ""}</small>}</div>
+    <div className="item-copy"><div className="item-main-line"><div className="item-description"><span>{quantityLabel(item.quantity, item.unit)}</span><strong>{item.name.replace(/\//g, "/\u200b")}</strong></div>{item.completed && item.unitPrice !== null && total !== null && <div className="item-price" aria-label={`${currency(item.unitPrice)}; ${t("purchaseTotal")} ${currency(total)}${trendText ? `; ${trendText}` : ""}`}><span>{currency(item.unitPrice)}{item.priceBasis ? `/${item.priceBasis}` : ` ${t("each")}`}</span><div className="item-price-total"><strong>{currency(total)}</strong>{priceDirection && <em className={`price-trend is-${priceDirection}`} title={trendText} aria-label={trendText}>{priceDirection === "down" ? "▼" : priceDirection === "up" ? "▲" : "—"}</em>}</div></div>}</div>{!item.completed && item.previousUnitPrice !== null && <span className={itemStyles.lastPrice}>{t("lastShort", { price: currency(item.previousUnitPrice) })}/{baseUnit(item.unit)}</span>}
+      {item.notes && <small className="item-notes">{item.notes}</small>}
+      {(item.completed || categoryName) && <small>{categoryName && <em className="item-category">{categoryName}</em>}{item.completed && (item.completedBy ? t("purchasedBy", { name: firstName(item.completedBy) }) : t("addedBy", { name: firstName(item.addedBy) }))}{item.completed && item.unitPrice !== null && item.previousUnitPrice === null ? ` · ${t(item.priceBasis ? "firstPrice" : "noMeasureComparison")}` : ""}{item.completed && item.unitPrice === null && showPriceStatus ? ` · ${t("priceNotInformed")}` : ""}</small>}</div>
     <div className={!item.completed ? itemStyles.actions : undefined}>{!item.completed && <><div className="item-actions"><button className="icon-button edit-button" type="button" onClick={() => onEdit(item)} aria-label={t("edit", { name: item.name })} disabled={busy}><Pencil /></button><button className="icon-button delete-button" type="button" onClick={() => onRemove(item.id)} aria-label={t("delete", { name: item.name })} disabled={busy}><Trash2 /></button></div><span className={itemStyles.author} title={t("addedBy", { name: item.addedBy })}>{t("addedByShort", { name: firstName(item.addedBy) })}</span></>}</div>
   </li>;
 }
